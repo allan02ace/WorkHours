@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#2f6fed">
+<title>Work Hours Tracker</title>
+<style>
+  :root{
+    --primary:#2f6fed;
+    --primary-dark:#1f56c9;
+    --bg:#f6f7fb;
+    --card:#ffffff;
+    --text:#111827;
+    --muted:#6b7280;
+    --border:#e5e7eb;
+    --danger:#dc2626;
+    --danger-bg:#fef2f2;
+    --chip-bg:#eef1f6;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+  }
+
+  .topbar{
+    background:#fff;
+    border-bottom:1px solid var(--border);
+    padding:16px 24px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand .icon{
+    width:40px;height:40px;border-radius:10px;
+    background:#eaf0fe;color:var(--primary);
+    display:flex;align-items:center;justify-content:center;
+    font-size:1.2rem;
+  }
+  .brand h1{margin:0;font-size:1.05rem;font-weight:700;}
+  .brand p{margin:1px 0 0;font-size:.78rem;color:var(--muted);}
+
+  .topbar-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+
+  .tabs{
+    display:flex;
+    background:var(--bg);
+    border-radius:9px;
+    padding:3px;
+    gap:2px;
+  }
+  .tab{
+    border:none;background:transparent;
+    padding:8px 14px;border-radius:7px;
+    font-size:.85rem;font-weight:600;color:var(--muted);
+    cursor:pointer;display:flex;align-items:center;gap:6px;
+  }
+  .tab.active{background:#fff;color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.08);}
+
+  button{font-family:inherit;cursor:pointer;}
+  .btn{
+    border:none;border-radius:9px;padding:10px 16px;
+    font-size:.85rem;font-weight:600;
+    display:inline-flex;align-items:center;gap:6px;
+  }
+  .btn-primary{background:var(--primary);color:#fff;}
+  .btn-primary:hover{background:var(--primary-dark);}
+  .btn-outline{background:#fff;border:1px solid var(--border);color:var(--text);}
+  .btn-outline:hover{background:var(--bg);}
+  button:active{transform:scale(.98);}
+
+  .container{
+    max-width:960px;
+    margin:0 auto;
+    padding:28px 20px 60px;
+  }
+
+  .stats{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:16px;
+    margin-bottom:20px;
+  }
+  .stat-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:20px;
+  }
+  .stat-card .label{font-size:.85rem;color:var(--muted);margin-bottom:8px;}
+  .stat-card .value{font-size:1.7rem;font-weight:700;color:var(--primary);}
+
+  .list-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    overflow:hidden;
+  }
+  .day-block{border-bottom:1px solid var(--border);}
+  .day-block:last-child{border-bottom:none;}
+  .entry-row{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:16px 20px;
+  }
+  .chevron{
+    color:var(--muted);
+    font-size:.9rem;
+    width:14px;
+    flex-shrink:0;
+    cursor:pointer;
+    user-select:none;
+    background:none;border:none;
+  }
+  .entry-date{min-width:150px;flex-shrink:0;}
+  .entry-date .d{font-weight:700;font-size:.95rem;}
+  .entry-date .dow{font-size:.8rem;color:var(--muted);}
+  .entry-time{
+    flex:1;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    color:var(--text);
+    font-size:.88rem;
+  }
+  .entry-time .ic{color:var(--muted);font-size:.85rem;}
+  .entry-hours{font-weight:700;color:var(--primary);min-width:40px;text-align:right;font-size:.92rem;}
+  .entry-actions{display:flex;align-items:center;gap:4px;}
+  .icon-btn{
+    border:none;background:transparent;
+    width:32px;height:32px;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--muted);font-size:.95rem;
+  }
+  .icon-btn:hover{background:var(--bg);}
+  .icon-btn.danger:hover{background:var(--danger-bg);color:var(--danger);}
+
+  .empty-state{padding:50px 20px;text-align:center;color:var(--muted);font-size:.9rem;}
+
+  /* Work items table */
+  .items-panel{
+    display:none;
+    padding:0 20px 18px 48px;
+    background:#fbfbfd;
+  }
+  .items-panel.open{display:block;}
+  .items-table{width:100%;border-collapse:collapse;font-size:.85rem;}
+  .items-table th{
+    text-align:left;
+    font-weight:600;
+    color:var(--muted);
+    font-size:.75rem;
+    text-transform:uppercase;
+    letter-spacing:.02em;
+    padding:8px 8px;
+    border-bottom:1px solid var(--border);
+  }
+  .items-table td{
+    padding:10px 8px;
+    border-bottom:1px solid var(--border);
+    vertical-align:middle;
+  }
+  .items-table tr:last-child td{border-bottom:none;}
+  .chip{
+    background:var(--chip-bg);
+    color:var(--text);
+    padding:3px 10px;
+    border-radius:999px;
+    font-size:.78rem;
+    display:inline-block;
+  }
+  .items-empty{padding:14px 8px;color:var(--muted);font-size:.83rem;}
+  .items-total-row td{font-weight:700;color:var(--primary);border-bottom:none !important;}
+  .add-item-btn{margin-top:12px;}
+  .dash{color:var(--muted);}
+
+  /* Modal */
+  .modal-overlay{
+    position:fixed;inset:0;
+    background:rgba(15,18,30,.5);
+    display:none;
+    align-items:center;justify-content:center;
+    padding:20px;
+    z-index:100;
+    overflow-y:auto;
+  }
+  .modal-overlay.open{display:flex;}
+  .modal{
+    background:#fff;
+    border-radius:16px;
+    padding:24px;
+    width:100%;
+    max-width:480px;
+    margin:auto;
+  }
+  .modal-header{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-bottom:20px;
+  }
+  .modal-header h2{margin:0;font-size:1.15rem;}
+  .modal-close{
+    border:none;background:transparent;font-size:1.1rem;
+    color:var(--muted);cursor:pointer;width:32px;height:32px;
+    border-radius:8px;
+  }
+  .modal-close:hover{background:var(--bg);}
+
+  .form-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+    margin-bottom:16px;
+  }
+  .form-grid .full{grid-column:1/-1;}
+  label{
+    font-size:.8rem;
+    font-weight:600;
+    color:var(--text);
+    display:block;
+    margin-bottom:6px;
+  }
+  .sublabel{font-weight:400;color:var(--muted);font-size:.75rem;}
+  input,select,textarea{
+    width:100%;
+    padding:10px 12px;
+    border:1px solid var(--border);
+    border-radius:9px;
+    font-size:.9rem;
+    font-family:inherit;
+    background:#fff;
+    color:var(--text);
+  }
+  textarea{resize:vertical;min-height:80px;}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--primary);outline-offset:1px;}
+  input[readonly]{background:var(--bg);color:var(--muted);}
+
+  .hours-chip-group{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-bottom:12px;
+  }
+  .hours-chip{
+    border:1px solid var(--border);
+    background:#fff;
+    color:var(--text);
+    padding:8px 12px;
+    border-radius:8px;
+    font-size:.85rem;
+    font-weight:600;
+    min-width:44px;
+    text-align:center;
+  }
+  .hours-chip.selected{background:var(--primary);color:#fff;border-color:var(--primary);}
+
+  .modal-footer{
+    display:flex;justify-content:flex-end;gap:10px;
+    margin-top:6px;
+  }
+
+  .summary-toolbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:12px;
+    margin-bottom:16px;
+  }
+  .summary-toolbar-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .range-label{font-size:.85rem;font-weight:600;color:var(--muted);}
+
+  @media (max-width:640px){
+    .stats{grid-template-columns:1fr;}
+    .form-grid{grid-template-columns:1fr;}
+    .entry-row{flex-wrap:wrap;}
+    .entry-date{min-width:110px;}
+    .items-panel{padding-left:20px;}
+    .items-table{display:block;overflow-x:auto;white-space:nowrap;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="icon">🕐</div>
+    <div>
+      <h1>Work Hours Tracker</h1>
+      <p>Daily timesheet log</p>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <div class="tabs">
+      <button class="tab active" id="tabLog">📋 Log</button>
+      <button class="tab" id="tabSummary">📊 Summary</button>
+    </div>
+    <div id="authArea" style="display:flex;align-items:center;gap:8px;"></div>
+    <button class="btn btn-outline" id="importBtn">⇩ Import</button>
+    <button class="btn btn-primary" id="addDayBtn">＋ Add Day</button>
+  </div>
+</div>
+<div id="syncBanner" style="display:none;background:#eef1f6;color:#374151;font-size:.8rem;text-align:center;padding:6px 10px;"></div>
+
+<div class="container">
+
+  <div class="stats">
+    <div class="stat-card">
+      <div class="label">Total Hours</div>
+      <div class="value" id="statTotal">0h 0m</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Days Logged</div>
+      <div class="value" id="statDays">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Avg / Day</div>
+      <div class="value" id="statAvg">0h 0m</div>
+    </div>
+  </div>
+
+  <div id="logView">
+    <div class="list-card" id="listCard">
+      <div class="empty-state">No days logged yet. Click "Add Day" to get started.</div>
+    </div>
+  </div>
+
+  <div id="summaryView" style="display:none;">
+    <div class="summary-toolbar">
+      <div class="range-label" id="rangeLabel">📅 Showing: All time</div>
+      <div class="summary-toolbar-actions">
+        <button class="btn btn-outline" id="customRangeBtn">🗓️ Custom Range</button>
+        <button class="btn btn-primary" id="exportCsvBtn">⇩ Export CSV</button>
+      </div>
+    </div>
+    <div class="list-card">
+      <div id="summaryContent" style="padding:20px;"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Add/Edit Day Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">Log Work Day</h2>
+      <button class="modal-close" id="modalCloseBtn">✕</button>
+    </div>
+    <form id="dayForm">
+      <div class="form-grid">
+        <div>
+          <label for="fDate">Date</label>
+          <input type="date" id="fDate" required>
+        </div>
+        <div>
+          <label for="fDay">Day</label>
+          <input type="text" id="fDay" readonly>
+        </div>
+        <div>
+          <label for="fStart">Time-in</label>
+          <input type="time" id="fStart" required>
+        </div>
+        <div>
+          <label for="fEnd">Time-out</label>
+          <input type="time" id="fEnd" required>
+        </div>
+        <div class="full">
+          <label for="fHours">Hours</label>
+          <input type="number" id="fHours" min="0" step="0.01" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" id="cancelBtn">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="submitBtn">Add Day</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Import Modal -->
+<div class="modal-overlay" id="importModalOverlay">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <h2>Import from Biometrics</h2>
+      <button class="modal-close" id="importModalCloseBtn">✕</button>
+    </div>
+    <p style="font-size:.85rem;color:var(--muted);margin-top:-8px;">
+      Two ways to paste: <strong>(1) Straight from your biometrics spreadsheet</strong> — just select the day-number
+      row and the times row for your name in Excel, copy, and paste below as-is (works even with multiple punches
+      stacked in one cell). Set the month/year first since the sheet only shows day numbers. Or
+      <strong>(2) one line per punch</strong>: <code>date, time-in, time-out</code>.
+      If a punch has no match, it's defaulted rather than skipped: a lone morning punch gets a time-out
+      8 hours later, and a lone afternoon/evening punch gets an 8:00 AM time-in.
+    </p>
+    <div class="form-grid" style="margin-bottom:10px;">
+      <div>
+        <label for="importMonth">Month <span class="sublabel">(for grid paste)</span></label>
+        <select id="importMonth">
+          <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+          <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+          <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+          <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+        </select>
+      </div>
+      <div>
+        <label for="importYear">Year</label>
+        <input type="number" id="importYear" min="2000" max="2100" step="1">
+      </div>
+    </div>
+    <textarea id="importText" rows="10" placeholder="Paste your copied Excel range here, or lines like:
+08/01/2026, 08:57, 18:02
+08/03/2026, 10:03, 18:02
+08/03/2026, 19:00, 19:18"></textarea>
+    <div id="importPreview" style="font-size:.82rem;color:var(--muted);margin-top:10px;max-height:160px;overflow-y:auto;"></div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline" id="importCancelBtn">Cancel</button>
+      <button type="button" class="btn btn-primary" id="importSubmitBtn">Import Entries</button>
+    </div>
+  </div>
+</div>
+
+<!-- Custom Range Modal -->
+<div class="modal-overlay" id="rangeModalOverlay">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-header">
+      <h2>Custom Range</h2>
+      <button class="modal-close" id="rangeModalCloseBtn">✕</button>
+    </div>
+    <div class="form-grid">
+      <div>
+        <label for="rangeFrom">From</label>
+        <input type="date" id="rangeFrom">
+      </div>
+      <div>
+        <label for="rangeTo">To</label>
+        <input type="date" id="rangeTo">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline" id="rangeClearBtn">Clear</button>
+      <button type="button" class="btn btn-outline" id="rangeCancelBtn">Cancel</button>
+      <button type="button" class="btn btn-primary" id="rangeApplyBtn">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Work Item Modal -->
+<div class="modal-overlay" id="itemModalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="itemModalTitle">Add Work Item</h2>
+      <button class="modal-close" id="itemModalCloseBtn">✕</button>
+    </div>
+    <form id="itemForm">
+      <div class="form-grid">
+        <div class="full">
+          <label for="iLocation">Location</label>
+          <input type="text" id="iLocation" placeholder="Office" required>
+        </div>
+        <div>
+          <label for="iClient">Client</label>
+          <input type="text" id="iClient" placeholder="Client name" list="clientSuggestions" autocomplete="off">
+          <datalist id="clientSuggestions"></datalist>
+        </div>
+        <div>
+          <label for="iNo">No. <span class="sublabel">(optional)</span></label>
+          <input type="text" id="iNo" placeholder="Task / ticket #">
+        </div>
+        <div class="full">
+          <label for="iWork">Work Accomplished</label>
+          <textarea id="iWork" placeholder="Describe what you accomplished..."></textarea>
+        </div>
+        <div class="full">
+          <label for="iApprover">Initial Approver <span class="sublabel">(optional)</span></label>
+          <input type="text" id="iApprover" placeholder="Initials of approver">
+        </div>
+      </div>
+      <label>Hours Worked</label>
+      <div class="hours-chip-group" id="hoursChipGroup">
+        <button type="button" class="hours-chip" data-val="0.25">0.25</button>
+        <button type="button" class="hours-chip" data-val="0.5">0.5</button>
+        <button type="button" class="hours-chip" data-val="0.75">0.75</button>
+        <button type="button" class="hours-chip" data-val="1">1</button>
+        <button type="button" class="hours-chip" data-val="1.5">1.5</button>
+        <button type="button" class="hours-chip" data-val="2">2</button>
+        <button type="button" class="hours-chip" data-val="3">3</button>
+        <button type="button" class="hours-chip" data-val="4">4</button>
+        <button type="button" class="hours-chip" data-val="5">5</button>
+        <button type="button" class="hours-chip" data-val="6">6</button>
+        <button type="button" class="hours-chip" data-val="7">7</button>
+        <button type="button" class="hours-chip" data-val="8">8</button>
+      </div>
+      <input type="number" id="iHours" min="0" step="0.25" style="margin-bottom:16px;" required>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" id="itemCancelBtn">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="itemSubmitBtn">Add Item</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script type="module">
+  // ---- Firebase (cloud sync so your data follows you across devices) ----
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+  import {
+    getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+  import {
+    getFirestore, doc, setDoc, onSnapshot
+  } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDUGyE6hRRTIWVllVMxCKrIL9nUJdnpruk",
+    authDomain: "workhours-c20be.firebaseapp.com",
+    projectId: "workhours-c20be",
+    storageBucket: "workhours-c20be.firebasestorage.app",
+    messagingSenderId: "503952630484",
+    appId: "1:503952630484:web:860e108efd83fbdd119141",
+    measurementId: "G-WKVS1EX4BC"
+  };
+  const fbApp = initializeApp(firebaseConfig);
+  const fbAuth = getAuth(fbApp);
+  const fbDb = getFirestore(fbApp);
+  const googleProvider = new GoogleAuthProvider();
+
+(function(){
+  const STORAGE_KEY = 'wht_days_v3';
+  let entries = load();
+  let editingId = null;
+  let expandedId = null;
+  let activeView = 'log';
+  let itemEditingDayId = null;
+  let itemEditingItemId = null;
+  let rangeStart = null;
+  let rangeEnd = null;
+  let currentUser = null;
+  let unsubscribeCloud = null;
+
+  const listCard = document.getElementById('listCard');
+  const modalOverlay = document.getElementById('modalOverlay');
+  const dayForm = document.getElementById('dayForm');
+  const modalTitle = document.getElementById('modalTitle');
+  const submitBtn = document.getElementById('submitBtn');
+
+  const fDate = document.getElementById('fDate');
+  const fDay = document.getElementById('fDay');
+  const fStart = document.getElementById('fStart');
+  const fEnd = document.getElementById('fEnd');
+  const fHours = document.getElementById('fHours');
+
+  const itemModalOverlay = document.getElementById('itemModalOverlay');
+  const itemForm = document.getElementById('itemForm');
+  const itemModalTitle = document.getElementById('itemModalTitle');
+  const itemSubmitBtn = document.getElementById('itemSubmitBtn');
+  const iLocation = document.getElementById('iLocation');
+  const iClient = document.getElementById('iClient');
+  const iNo = document.getElementById('iNo');
+  const iWork = document.getElementById('iWork');
+  const iApprover = document.getElementById('iApprover');
+  const iHours = document.getElementById('iHours');
+  const hoursChipGroup = document.getElementById('hoursChipGroup');
+
+  function load(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return parsed.map(en => Object.assign({ items: [] }, en));
+    }catch(e){ return []; }
+  }
+  function save(){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    pushToCloud();
+  }
+
+  // ---- Cloud sync (Google sign-in + Firestore) ----
+  function cloudDocRef(){ return doc(fbDb, 'users', currentUser.uid); }
+
+  async function pushToCloud(){
+    if(!currentUser) return;
+    try{
+      await setDoc(cloudDocRef(), { entries, clients: loadClients(), updatedAt: Date.now() }, { merge: true });
+    }catch(e){ console.error('Cloud save failed', e); showSyncBanner('⚠️ Could not save to the cloud (check connection)', true); }
+  }
+
+  function startCloudSync(user){
+    currentUser = user;
+    if(unsubscribeCloud) unsubscribeCloud();
+    unsubscribeCloud = onSnapshot(cloudDocRef(), (snap)=>{
+      if(snap.exists()){
+        const data = snap.data();
+        entries = Array.isArray(data.entries) ? data.entries : entries;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+        if(Array.isArray(data.clients)) saveClientsLocalOnly(data.clients);
+        renderAll();
+        renderClientSuggestions();
+        showSyncBanner('☁️ Synced with your Google account', true);
+      } else {
+        // First sign-in on this account: seed the cloud with whatever is on this device
+        pushToCloud();
+      }
+    }, (err)=>{
+      console.error('Cloud sync error', err);
+      showSyncBanner('⚠️ Cloud sync error — working offline', true);
+    });
+  }
+
+  function stopCloudSync(){
+    if(unsubscribeCloud) unsubscribeCloud();
+    unsubscribeCloud = null;
+    currentUser = null;
+    showSyncBanner('', false);
+  }
+
+  function showSyncBanner(msg, visible){
+    const b = document.getElementById('syncBanner');
+    if(!b) return;
+    b.textContent = msg;
+    b.style.display = visible ? 'block' : 'none';
+  }
+
+  function renderAuthArea(user){
+    const el = document.getElementById('authArea');
+    if(!el) return;
+    if(user){
+      const avatar = user.photoURL ? `<img src="${user.photoURL}" alt="" style="width:26px;height:26px;border-radius:50%;">` : '';
+      const name = escapeHtml(user.displayName || user.email || 'Signed in');
+      el.innerHTML = `${avatar}<span style="font-size:.78rem;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</span><button class="btn btn-outline" id="signOutBtn" style="padding:6px 10px;font-size:.78rem;">Sign out</button>`;
+      document.getElementById('signOutBtn').addEventListener('click', ()=> signOut(fbAuth));
+    } else {
+      el.innerHTML = `<button class="btn btn-outline" id="signInBtn" style="padding:6px 10px;font-size:.78rem;">🔑 Sign in with Google</button>`;
+      document.getElementById('signInBtn').addEventListener('click', ()=>{
+        signInWithPopup(fbAuth, googleProvider).catch(err=>{
+          console.error(err);
+          alert('Sign-in failed: ' + err.message);
+        });
+      });
+    }
+  }
+
+  onAuthStateChanged(fbAuth, (user)=>{
+    renderAuthArea(user);
+    if(user) startCloudSync(user);
+    else stopCloudSync();
+  });
+
+  // ---- Recurring client suggestions ----
+  const CLIENTS_KEY = 'wht_clients_v1';
+  const clientSuggestions = document.getElementById('clientSuggestions');
+  function loadClients(){
+    try{
+      const raw = localStorage.getItem(CLIENTS_KEY);
+      return raw ? JSON.parse(raw) : [];
+    }catch(e){ return []; }
+  }
+  function saveClientsLocalOnly(list){
+    localStorage.setItem(CLIENTS_KEY, JSON.stringify(list));
+    renderClientSuggestions();
+  }
+  function saveClients(list){
+    saveClientsLocalOnly(list);
+    pushToCloud();
+  }
+  function renderClientSuggestions(){
+    const clients = loadClients();
+    clientSuggestions.innerHTML = clients.map(c => `<option value="${escapeHtml(c)}"></option>`).join('');
+  }
+  function rememberClient(name){
+    const trimmed = (name || '').trim();
+    if(!trimmed) return;
+    let clients = loadClients();
+    // Case-insensitive de-dupe, keep most recent entry at the front
+    clients = clients.filter(c => c.toLowerCase() !== trimmed.toLowerCase());
+    clients.unshift(trimmed);
+    if(clients.length > 50) clients = clients.slice(0, 50);
+    saveClients(clients);
+  }
+  renderClientSuggestions();
+  function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+  function pad(n){ return n.toString().padStart(2,'0'); }
+
+  function dayOfWeek(dateStr){
+    const d = new Date(dateStr+'T00:00:00');
+    return d.toLocaleDateString(undefined,{weekday:'long'});
+  }
+  function fmtDateShort(dateStr){
+    const d = new Date(dateStr+'T00:00:00');
+    return d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+  }
+  function to12h(hhmm){
+    const [h,m] = hhmm.split(':').map(Number);
+    const period = h >= 12 ? 'PM' : 'AM';
+    let h12 = h % 12; if(h12===0) h12=12;
+    return `${h12}:${pad(m)} ${period}`;
+  }
+  function computeHours(start,end){
+    const [sh,sm] = start.split(':').map(Number);
+    const [eh,em] = end.split(':').map(Number);
+    let diff = (eh*60+em) - (sh*60+sm);
+    if(diff < 0) diff += 24*60;
+    return Math.round((diff/60)*100)/100;
+  }
+  function fmtHM(hoursFloat){
+    const totalMin = Math.round(hoursFloat*60);
+    const h = Math.floor(totalMin/60);
+    const m = totalMin%60;
+    return `${h}h ${m}m`;
+  }
+  function fmtHoursShort(n){
+    return (Math.round(n*100)/100) + 'h';
+  }
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str == null ? '' : str;
+    return div.innerHTML;
+  }
+
+  // ---- Day form: auto-fill Day + Hours ----
+  fDate.addEventListener('change', ()=>{
+    if(fDate.value) fDay.value = dayOfWeek(fDate.value);
+  });
+  function recalcHours(){
+    if(fStart.value && fEnd.value){
+      fHours.value = computeHours(fStart.value, fEnd.value);
+    }
+  }
+  fStart.addEventListener('change', recalcHours);
+  fEnd.addEventListener('change', recalcHours);
+
+  function openModal(entry){
+    editingId = entry ? entry.id : null;
+    modalTitle.textContent = entry ? 'Edit Work Day' : 'Log Work Day';
+    submitBtn.textContent = entry ? 'Save Changes' : 'Add Day';
+    if(entry){
+      fDate.value = entry.date;
+      fDay.value = dayOfWeek(entry.date);
+      fStart.value = entry.start;
+      fEnd.value = entry.end;
+      fHours.value = entry.hours;
+    } else {
+      const today = new Date();
+      fDate.value = today.toISOString().slice(0,10);
+      fDay.value = dayOfWeek(fDate.value);
+      fStart.value = '09:00';
+      fEnd.value = '18:00';
+      recalcHours();
+    }
+    modalOverlay.classList.add('open');
+  }
+  function closeModal(){
+    modalOverlay.classList.remove('open');
+    dayForm.reset();
+    editingId = null;
+  }
+
+  document.getElementById('addDayBtn').addEventListener('click', ()=>openModal(null));
+  document.getElementById('cancelBtn').addEventListener('click', closeModal);
+  document.getElementById('modalCloseBtn').addEventListener('click', closeModal);
+  modalOverlay.addEventListener('click', (e)=>{ if(e.target === modalOverlay) closeModal(); });
+
+  dayForm.addEventListener('submit', (e)=>{
+    e.preventDefault();
+    const data = {
+      date: fDate.value,
+      start: fStart.value,
+      end: fEnd.value,
+      hours: parseFloat(fHours.value) || 0
+    };
+    if(editingId){
+      entries = entries.map(en => en.id === editingId ? Object.assign({}, en, data) : en);
+    } else {
+      entries.push(Object.assign({ id: uid(), items: [] }, data));
+    }
+    save();
+    closeModal();
+    renderAll();
+  });
+
+  function deleteEntry(id){
+    if(!confirm('Delete this logged day?')) return;
+    entries = entries.filter(en => en.id !== id);
+    save();
+    renderAll();
+  }
+  function editEntry(id){
+    const entry = entries.find(en=>en.id===id);
+    if(entry) openModal(entry);
+  }
+  function toggleExpand(id){
+    expandedId = expandedId === id ? null : id;
+    renderList();
+  }
+
+  // ---- Work item modal ----
+  function setSelectedChip(val){
+    const chips = hoursChipGroup.querySelectorAll('.hours-chip');
+    chips.forEach(c => c.classList.toggle('selected', parseFloat(c.dataset.val) === parseFloat(val)));
+  }
+  hoursChipGroup.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.hours-chip');
+    if(!btn) return;
+    iHours.value = btn.dataset.val;
+    setSelectedChip(btn.dataset.val);
+  });
+  iHours.addEventListener('input', ()=> setSelectedChip(iHours.value));
+
+  function openItemModal(dayId, item){
+    itemEditingDayId = dayId;
+    itemEditingItemId = item ? item.id : null;
+    itemModalTitle.textContent = item ? 'Edit Work Item' : 'Add Work Item';
+    itemSubmitBtn.textContent = item ? 'Save Changes' : 'Add Item';
+    if(item){
+      iLocation.value = item.location || '';
+      iClient.value = item.client || '';
+      iNo.value = item.no || '';
+      iWork.value = item.work || '';
+      iApprover.value = item.approver || '';
+      iHours.value = item.hours;
+      setSelectedChip(item.hours);
+    } else {
+      iLocation.value = 'Office';
+      iClient.value = '';
+      iNo.value = '';
+      iWork.value = '';
+      iApprover.value = '';
+      iHours.value = '1';
+      setSelectedChip('1');
+    }
+    itemModalOverlay.classList.add('open');
+  }
+  function closeItemModal(){
+    itemModalOverlay.classList.remove('open');
+    itemForm.reset();
+    itemEditingDayId = null;
+    itemEditingItemId = null;
+  }
+  document.getElementById('itemCancelBtn').addEventListener('click', closeItemModal);
+  document.getElementById('itemModalCloseBtn').addEventListener('click', closeItemModal);
+  itemModalOverlay.addEventListener('click', (e)=>{ if(e.target === itemModalOverlay) closeItemModal(); });
+
+  itemForm.addEventListener('submit', (e)=>{
+    e.preventDefault();
+    const data = {
+      location: iLocation.value.trim() || 'Office',
+      client: iClient.value.trim(),
+      no: iNo.value.trim(),
+      work: iWork.value.trim(),
+      approver: iApprover.value.trim(),
+      hours: parseFloat(iHours.value) || 0
+    };
+    rememberClient(data.client);
+    entries = entries.map(en=>{
+      if(en.id !== itemEditingDayId) return en;
+      const items = en.items ? en.items.slice() : [];
+      if(itemEditingItemId){
+        return Object.assign({}, en, { items: items.map(it => it.id === itemEditingItemId ? Object.assign({}, it, data) : it) });
+      } else {
+        items.push(Object.assign({ id: uid() }, data));
+        return Object.assign({}, en, { items });
+      }
+    });
+    save();
+    closeItemModal();
+    renderAll();
+  });
+
+  function deleteItem(dayId, itemId){
+    if(!confirm('Delete this work item?')) return;
+    entries = entries.map(en=>{
+      if(en.id !== dayId) return en;
+      return Object.assign({}, en, { items: (en.items||[]).filter(it=>it.id!==itemId) });
+    });
+    save();
+    renderAll();
+  }
+
+  window.WHT = {
+    deleteEntry, editEntry, toggleExpand,
+    addItem: (dayId)=> openItemModal(dayId, null),
+    editItem: (dayId, itemId)=>{
+      const day = entries.find(en=>en.id===dayId);
+      const item = day && day.items.find(it=>it.id===itemId);
+      if(item) openItemModal(dayId, item);
+    },
+    deleteItem
+  };
+
+  // ---- Import from biometrics paste ----
+  const importModalOverlay = document.getElementById('importModalOverlay');
+  const importText = document.getElementById('importText');
+  const importPreview = document.getElementById('importPreview');
+  const importMonth = document.getElementById('importMonth');
+  const importYear = document.getElementById('importYear');
+
+  document.getElementById('importBtn').addEventListener('click', ()=>{
+    importText.value = '';
+    importPreview.textContent = '';
+    const now = new Date();
+    importMonth.value = String(now.getMonth()+1);
+    importYear.value = now.getFullYear();
+    importModalOverlay.classList.add('open');
+  });
+  document.getElementById('importCancelBtn').addEventListener('click', closeImportModal);
+  document.getElementById('importModalCloseBtn').addEventListener('click', closeImportModal);
+  importModalOverlay.addEventListener('click', (e)=>{ if(e.target === importModalOverlay) closeImportModal(); });
+  function closeImportModal(){
+    importModalOverlay.classList.remove('open');
+  }
+
+  function parseDate(raw){
+    raw = raw.trim();
+    // YYYY-MM-DD
+    let m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if(m) return `${m[1]}-${pad(+m[2])}-${pad(+m[3])}`;
+    // M/D/YYYY or M-D-YYYY
+    m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if(m) return `${m[3]}-${pad(+m[1])}-${pad(+m[2])}`;
+    return null;
+  }
+  function parseTime(raw){
+    raw = raw.trim();
+    let m = raw.match(/^(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)?$/);
+    if(!m) return null;
+    let h = +m[1], min = +m[2];
+    if(m[3]){
+      const ap = m[3].toUpperCase();
+      if(ap === 'PM' && h !== 12) h += 12;
+      if(ap === 'AM' && h === 12) h = 0;
+    }
+    if(h > 23 || min > 59) return null;
+    return `${pad(h)}:${pad(min)}`;
+  }
+  function timeToMin(t){
+    const [h,m] = t.split(':').map(Number);
+    return h*60+m;
+  }
+  function minToTime(mins){
+    mins = ((mins % 1440)+1440) % 1440;
+    return `${pad(Math.floor(mins/60))}:${pad(mins%60)}`;
+  }
+
+  // Tokenizes pasted clipboard text into rows/cells, respecting Excel's
+  // tab-separated + double-quote-wrapped (for cells containing tabs/newlines) format.
+  function tokenizeGrid(text){
+    const rows = [];
+    let row = [], field = '', inQuotes = false;
+    for(let i=0;i<text.length;i++){
+      const c = text[i];
+      if(inQuotes){
+        if(c === '"'){
+          if(text[i+1] === '"'){ field += '"'; i++; }
+          else inQuotes = false;
+        } else field += c;
+      } else {
+        if(c === '"') inQuotes = true;
+        else if(c === '\t'){ row.push(field); field=''; }
+        else if(c === '\n'){ row.push(field); field=''; rows.push(row); row=[]; }
+        else if(c === '\r'){ /* skip */ }
+        else field += c;
+      }
+    }
+    if(field.length || row.length){ row.push(field); rows.push(row); }
+    return rows;
+  }
+
+  function extractTimesFromCell(cellText){
+    return cellText.split('\n').map(s=>s.trim()).filter(Boolean)
+      .map(parseTime).filter(Boolean);
+  }
+
+  // Detects a "day number header" row: mostly-ascending integers between 1 and 31.
+  function isHeaderRow(row){
+    const nums = row.map(c=>c.trim()).filter(Boolean).map(Number)
+      .filter(n => Number.isInteger(n) && n>=1 && n<=31);
+    if(nums.length < 4) return false;
+    for(let i=1;i<nums.length;i++){ if(nums[i] <= nums[i-1]) return false; }
+    return true;
+  }
+  function looksLikeUserBreak(row){
+    return row.some(c => /user id|name:|department:/i.test(c));
+  }
+
+  // Attempts to parse a raw pasted Excel grid (day-number header row + one or more
+  // data rows below, cells may contain multiple stacked punches separated by newlines).
+  function parseGridPaste(text, month, year){
+    const rows = tokenizeGrid(text).filter(r => r.some(c => c.trim() !== ''));
+    const punches = [];
+    const warnings = [];
+    let foundHeader = false;
+
+    for(let r=0; r<rows.length; r++){
+      if(!isHeaderRow(rows[r])) continue;
+      foundHeader = true;
+      const headerRow = rows[r];
+      // Map column index -> day number
+      const colToDay = {};
+      headerRow.forEach((cell, colIdx)=>{
+        const n = parseInt(cell.trim(),10);
+        if(Number.isInteger(n) && n>=1 && n<=31) colToDay[colIdx] = n;
+      });
+
+      // Merge subsequent rows (per column) until next header row or a user/name break
+      const mergedByCol = {};
+      let r2 = r+1;
+      for(; r2<rows.length; r2++){
+        if(isHeaderRow(rows[r2]) || looksLikeUserBreak(rows[r2])) break;
+        rows[r2].forEach((cell, colIdx)=>{
+          const val = cell.trim();
+          if(!val) return;
+          mergedByCol[colIdx] = (mergedByCol[colIdx] ? mergedByCol[colIdx]+'\n' : '') + val;
+        });
+      }
+
+      Object.keys(colToDay).forEach(colIdx=>{
+        const day = colToDay[colIdx];
+        const cellText = mergedByCol[colIdx];
+        if(!cellText) return;
+        const times = extractTimesFromCell(cellText);
+        if(times.length === 0) return;
+        const dateStr = `${year}-${pad(month)}-${pad(day)}`;
+        for(let i=0; i+1<times.length; i+=2){
+          punches.push({ date: dateStr, start: times[i], end: times[i+1] });
+        }
+        if(times.length % 2 === 1){
+          const lone = times[times.length-1];
+          const loneMin = timeToMin(lone);
+          if(loneMin < 720){
+            // Looks like a morning time-in with no matching time-out — default to +8h.
+            const defaultOut = minToTime(loneMin + 8*60);
+            punches.push({ date: dateStr, start: lone, end: defaultOut });
+            warnings.push(`${dateStr}: unpaired punch at ${lone} had no time-out — defaulted to ${defaultOut} (+8h).`);
+          } else {
+            // Looks like an afternoon/evening time-out with no matching time-in — default to 8:00 AM.
+            const defaultIn = '08:00';
+            punches.push({ date: dateStr, start: defaultIn, end: lone });
+            warnings.push(`${dateStr}: unpaired punch at ${lone} had no time-in — defaulted to ${defaultIn}.`);
+          }
+        }
+      });
+
+      r = r2 - 1; // continue scanning after this block
+    }
+
+    return { punches, warnings, foundHeader };
+  }
+
+  function parseImportLines(raw){
+    const lines = raw.split('\n').map(l=>l.trim()).filter(Boolean);
+    const punches = [];
+    const errors = [];
+    lines.forEach((line, idx)=>{
+      const parts = line.split(/,|\t/).map(p=>p.trim()).filter(Boolean);
+      if(parts.length < 3){ errors.push(`Line ${idx+1}: expected date, time-in, time-out`); return; }
+      const date = parseDate(parts[0]);
+      const start = parseTime(parts[1]);
+      const end = parseTime(parts[2]);
+      if(!date || !start || !end){ errors.push(`Line ${idx+1}: couldn't read "${line}"`); return; }
+      punches.push({ date, start, end });
+    });
+    return { punches, errors };
+  }
+
+  function mergePunchesByDate(punches){
+    const byDate = {};
+    punches.forEach(p=>{
+      if(!byDate[p.date]) byDate[p.date] = [];
+      byDate[p.date].push(p);
+    });
+    return Object.keys(byDate).map(date=>{
+      const sessions = byDate[date];
+      let totalMin = 0;
+      let earliestStart = null, latestEnd = null;
+      sessions.forEach(s=>{
+        let sMin = timeToMin(s.start), eMin = timeToMin(s.end);
+        if(eMin < sMin) eMin += 1440;
+        totalMin += (eMin - sMin);
+        if(earliestStart === null || timeToMin(s.start) < timeToMin(earliestStart)) earliestStart = s.start;
+        if(latestEnd === null || timeToMin(s.end) > timeToMin(latestEnd)) latestEnd = s.end;
+      });
+      return {
+        date,
+        start: earliestStart,
+        end: latestEnd,
+        hours: Math.round((totalMin/60)*100)/100
+      };
+    });
+  }
+
+  document.getElementById('importSubmitBtn').addEventListener('click', ()=>{
+    const raw = importText.value;
+    if(!raw.trim()){
+      importPreview.textContent = 'Nothing to import — paste some rows first.';
+      return;
+    }
+
+    let punches = [], warnings = [];
+    const gridResult = parseGridPaste(raw, parseInt(importMonth.value,10), parseInt(importYear.value,10));
+
+    if(gridResult.foundHeader){
+      punches = gridResult.punches;
+      warnings = gridResult.warnings;
+      if(punches.length === 0){
+        importPreview.innerHTML = `<span style="color:var(--danger);">Found a day-number header row but no readable punch times underneath. Double-check you copied the times row along with the header row.</span>`;
+        return;
+      }
+    } else {
+      const lineResult = parseImportLines(raw);
+      if(lineResult.punches.length === 0){
+        importPreview.innerHTML = lineResult.errors.length
+          ? `<span style="color:var(--danger);">${lineResult.errors.join('<br>')}</span>`
+          : 'Nothing to import — paste some rows first.';
+        return;
+      }
+      punches = lineResult.punches;
+      warnings = lineResult.errors;
+    }
+
+    const merged = mergePunchesByDate(punches);
+    let addedCount = 0, updatedCount = 0;
+    merged.forEach(m=>{
+      const existingIdx = entries.findIndex(en=>en.date===m.date);
+      if(existingIdx >= 0){
+        entries[existingIdx] = Object.assign({}, entries[existingIdx], { start:m.start, end:m.end, hours:m.hours });
+        updatedCount++;
+      } else {
+        entries.push({ id: uid(), date:m.date, start:m.start, end:m.end, hours:m.hours, items: [] });
+        addedCount++;
+      }
+    });
+    save();
+    let msg = `Imported ${merged.length} day(s): ${addedCount} added, ${updatedCount} updated.`;
+    if(warnings.length) msg += ` ${warnings.length} issue(s) noted below.`;
+    importPreview.innerHTML = `<span style="color:var(--primary);">${msg}</span>` + (warnings.length ? `<br><span style="color:var(--danger);">${warnings.join('<br>')}</span>` : '');
+    renderAll();
+  });
+
+  // ---- Tabs ----
+  document.getElementById('tabLog').addEventListener('click', ()=>switchView('log'));
+  document.getElementById('tabSummary').addEventListener('click', ()=>switchView('summary'));
+  function switchView(view){
+    activeView = view;
+    document.getElementById('tabLog').classList.toggle('active', view==='log');
+    document.getElementById('tabSummary').classList.toggle('active', view==='summary');
+    document.getElementById('logView').style.display = view==='log' ? 'block' : 'none';
+    document.getElementById('summaryView').style.display = view==='summary' ? 'block' : 'none';
+    if(view==='summary') renderSummary();
+  }
+
+  // ---- Rendering ----
+  function renderStats(){
+    const totalHours = entries.reduce((sum,en)=>sum+en.hours,0);
+    const days = entries.length;
+    const avg = days ? totalHours/days : 0;
+    document.getElementById('statTotal').textContent = fmtHM(totalHours);
+    document.getElementById('statDays').textContent = days;
+    document.getElementById('statAvg').textContent = fmtHM(avg);
+  }
+
+  function renderItemsPanel(en){
+    const items = en.items || [];
+    const isOpen = expandedId === en.id;
+    let rows = '';
+    if(items.length === 0){
+      rows = `<div class="items-empty">No work items logged for this day yet.</div>`;
+    } else {
+      const itemsTotal = items.reduce((s,it)=>s+it.hours,0);
+      rows = `<table class="items-table">
+        <thead>
+          <tr><th>Location</th><th>Client</th><th>No.</th><th>Work Accomplished</th><th>Hours</th><th>Initial Approver</th><th></th></tr>
+        </thead>
+        <tbody>`;
+      items.forEach(it=>{
+        rows += `<tr>
+          <td><span class="chip">${escapeHtml(it.location)}</span></td>
+          <td>${it.client ? escapeHtml(it.client) : '<span class="dash">—</span>'}</td>
+          <td>${it.no ? escapeHtml(it.no) : '<span class="dash">—</span>'}</td>
+          <td>${it.work ? escapeHtml(it.work) : '<span class="dash">—</span>'}</td>
+          <td style="font-weight:700;color:var(--primary);">${fmtHoursShort(it.hours)}</td>
+          <td>${it.approver ? escapeHtml(it.approver) : '<span class="dash">—</span>'}</td>
+          <td>
+            <div class="entry-actions">
+              <button class="icon-btn" title="Edit" onclick="WHT.editItem('${en.id}','${it.id}')">✎</button>
+              <button class="icon-btn danger" title="Delete" onclick="WHT.deleteItem('${en.id}','${it.id}')">🗑</button>
+            </div>
+          </td>
+        </tr>`;
+      });
+      rows += `<tr class="items-total-row"><td colspan="4" style="text-align:right;">Items total</td><td>${fmtHoursShort(itemsTotal)}</td><td></td><td></td></tr>`;
+      rows += `</tbody></table>`;
+    }
+    return `<div class="items-panel ${isOpen ? 'open' : ''}">
+      ${rows}
+      <button type="button" class="btn btn-outline add-item-btn" onclick="WHT.addItem('${en.id}')">＋ Add Work Item</button>
+    </div>`;
+  }
+
+  function renderList(){
+    if(entries.length === 0){
+      listCard.innerHTML = '<div class="empty-state">No days logged yet. Click "Add Day" to get started.</div>';
+      return;
+    }
+    const sorted = entries.slice().sort((a,b)=> b.date.localeCompare(a.date));
+    let html = '';
+    sorted.forEach(en=>{
+      const isOpen = expandedId === en.id;
+      html += `<div class="day-block">
+        <div class="entry-row">
+          <button class="chevron" onclick="WHT.toggleExpand('${en.id}')">${isOpen ? '▾' : '▸'}</button>
+          <div class="entry-date">
+            <div class="d">${fmtDateShort(en.date)}</div>
+            <div class="dow">${dayOfWeek(en.date)}</div>
+          </div>
+          <div class="entry-time">
+            <span class="ic">🕐</span>
+            <span>${to12h(en.start)} – ${to12h(en.end)}</span>
+          </div>
+          <div class="entry-hours">${en.hours}h</div>
+          <div class="entry-actions">
+            <button class="icon-btn" title="Edit" onclick="WHT.editEntry('${en.id}')">✎</button>
+            <button class="icon-btn danger" title="Delete" onclick="WHT.deleteEntry('${en.id}')">🗑</button>
+          </div>
+        </div>
+        ${renderItemsPanel(en)}
+      </div>`;
+    });
+    listCard.innerHTML = html;
+  }
+
+  // ---- Custom range filtering ----
+  function inRange(dateStr){
+    if(rangeStart && dateStr < rangeStart) return false;
+    if(rangeEnd && dateStr > rangeEnd) return false;
+    return true;
+  }
+  function filteredEntries(){
+    return entries.filter(en => inRange(en.date));
+  }
+  function updateRangeLabel(){
+    const el = document.getElementById('rangeLabel');
+    if(!rangeStart && !rangeEnd){
+      el.textContent = '📅 Showing: All time';
+    } else if(rangeStart && rangeEnd){
+      el.textContent = `📅 Showing: ${fmtDateShort(rangeStart)} – ${fmtDateShort(rangeEnd)}`;
+    } else if(rangeStart){
+      el.textContent = `📅 Showing: From ${fmtDateShort(rangeStart)}`;
+    } else {
+      el.textContent = `📅 Showing: Through ${fmtDateShort(rangeEnd)}`;
+    }
+  }
+
+  const rangeModalOverlay = document.getElementById('rangeModalOverlay');
+  const rangeFrom = document.getElementById('rangeFrom');
+  const rangeTo = document.getElementById('rangeTo');
+  document.getElementById('customRangeBtn').addEventListener('click', ()=>{
+    rangeFrom.value = rangeStart || '';
+    rangeTo.value = rangeEnd || '';
+    rangeModalOverlay.classList.add('open');
+  });
+  function closeRangeModal(){ rangeModalOverlay.classList.remove('open'); }
+  document.getElementById('rangeModalCloseBtn').addEventListener('click', closeRangeModal);
+  document.getElementById('rangeCancelBtn').addEventListener('click', closeRangeModal);
+  rangeModalOverlay.addEventListener('click', (e)=>{ if(e.target === rangeModalOverlay) closeRangeModal(); });
+  document.getElementById('rangeClearBtn').addEventListener('click', ()=>{
+    rangeStart = null; rangeEnd = null;
+    closeRangeModal();
+    updateRangeLabel();
+    renderSummary();
+  });
+  document.getElementById('rangeApplyBtn').addEventListener('click', ()=>{
+    rangeStart = rangeFrom.value || null;
+    rangeEnd = rangeTo.value || null;
+    closeRangeModal();
+    updateRangeLabel();
+    renderSummary();
+  });
+
+  function renderSummary(){
+    updateRangeLabel();
+    const el = document.getElementById('summaryContent');
+    const scoped = filteredEntries();
+    if(scoped.length === 0){
+      el.innerHTML = '<div class="empty-state">No data for this range.</div>';
+      return;
+    }
+    const totalHours = scoped.reduce((s,en)=>s+en.hours,0);
+    const days = scoped.length;
+    const avg = days ? totalHours/days : 0;
+
+    const weekTotals = {};
+    scoped.forEach(en=>{
+      const d = new Date(en.date+'T00:00:00');
+      const dow = (d.getDay()+6)%7;
+      const monday = new Date(d);
+      monday.setDate(d.getDate()-dow);
+      const key = monday.toISOString().slice(0,10);
+      weekTotals[key] = (weekTotals[key]||0) + en.hours;
+    });
+    const weeks = Object.keys(weekTotals).sort().reverse();
+
+    let html = `<div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border);">
+      <div><div class="label" style="font-size:.78rem;color:var(--muted);">Total Hours</div><div style="font-size:1.3rem;font-weight:700;color:var(--primary);">${fmtHM(totalHours)}</div></div>
+      <div><div class="label" style="font-size:.78rem;color:var(--muted);">Work Days</div><div style="font-size:1.3rem;font-weight:700;">${days}</div></div>
+      <div><div class="label" style="font-size:.78rem;color:var(--muted);">Avg / Day</div><div style="font-size:1.3rem;font-weight:700;">${fmtHM(avg)}</div></div>
+    </div>`;
+    html += '<div style="font-weight:700;margin-bottom:14px;font-size:.95rem;">Weekly Totals</div>';
+    weeks.forEach(wk=>{
+      const label = fmtDateShort(wk);
+      const hrs = weekTotals[wk];
+      html += `<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:.88rem;">
+        <span>Week of ${label}</span><span style="font-weight:700;color:var(--primary);">${fmtHM(hrs)}</span>
+      </div>`;
+    });
+    el.innerHTML = html;
+  }
+
+  // ---- Export CSV (Excel-formatted, Aptos 10pt, matches timesheet columns) ----
+  function cellHtml(str){
+    return escapeHtml(str == null ? '' : str).replace(/\n/g,'<br>');
+  }
+  function fmtDateExport(dateStr){
+    const [y,m,d] = dateStr.split('-');
+    return `${m}/${d}/${y}`;
+  }
+  function exportTimesheet(){
+    const scoped = filteredEntries().slice().sort((a,b)=> a.date.localeCompare(b.date));
+    if(scoped.length === 0){
+      alert('No entries to export for the selected range.');
+      return;
+    }
+    const FONT = 'font-family:Aptos, Calibri, sans-serif;font-size:10pt;';
+    let body = '';
+    scoped.forEach(en=>{
+      const items = (en.items && en.items.length) ? en.items : [null];
+      const rowCount = items.length;
+      const dayTotal = computeHours(en.start, en.end);
+      items.forEach((it, idx)=>{
+        body += '<tr>';
+        if(idx === 0){
+          body += `<td rowspan="${rowCount}" style="${FONT}mso-number-format:'\\@';">${cellHtml(fmtDateExport(en.date))}</td>`;
+          body += `<td rowspan="${rowCount}" style="${FONT}">${cellHtml(dayOfWeek(en.date))}</td>`;
+        }
+        body += `<td style="${FONT}">${it ? cellHtml(it.location) : ''}</td>`;
+        if(idx === 0){
+          body += `<td rowspan="${rowCount}" style="${FONT}mso-number-format:'\\@';">${cellHtml(to12h(en.start))}</td>`;
+          body += `<td rowspan="${rowCount}" style="${FONT}mso-number-format:'\\@';">${cellHtml(to12h(en.end))}</td>`;
+        }
+        body += `<td style="${FONT}">${it ? cellHtml(it.client) : ''}</td>`;
+        body += `<td style="${FONT}">${it ? cellHtml(it.no) : ''}</td>`;
+        body += `<td style="${FONT}">${it ? cellHtml(it.work) : ''}</td>`;
+        body += `<td style="${FONT}text-align:right;">${it ? cellHtml(it.hours) : ''}</td>`;
+        body += `<td style="${FONT}">${it ? cellHtml(it.approver) : ''}</td>`;
+        if(idx === 0){
+          body += `<td rowspan="${rowCount}" style="${FONT}text-align:right;">${cellHtml(dayTotal)}</td>`;
+        }
+        body += '</tr>';
+      });
+    });
+
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="UTF-8">
+<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Timesheet</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+<style>
+  table{border-collapse:collapse;${FONT}}
+  th,td{border:1px solid #000000;padding:4px 8px;${FONT}vertical-align:top;}
+  th{background:#DCE6F1;font-weight:bold;text-align:center;}
+</style>
+</head>
+<body>
+<table>
+<tr>
+  <th>Date</th><th>Day</th><th>Location</th><th>Time-in</th><th>Time-out</th>
+  <th>Client</th><th>No.</th><th>Work Accomplished</th><th>Hours Worked</th>
+  <th>Initial Approver</th><th>Hours Total (Day)</th>
+</tr>
+${body}
+</table>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const nameFrom = rangeStart || scoped[0].date;
+    const nameTo = rangeEnd || scoped[scoped.length-1].date;
+    a.href = url;
+    a.download = `Timesheet_${nameFrom}_to_${nameTo}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  document.getElementById('exportCsvBtn').addEventListener('click', exportTimesheet);
+
+  function renderAll(){
+    renderStats();
+    renderList();
+    if(activeView === 'summary') renderSummary();
+  }
+
+  renderAll();
+})();
+</script>
+
+</body>
+</html>
