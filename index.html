@@ -142,7 +142,7 @@
   }
   .entry-time .ic{color:var(--muted);font-size:.85rem;}
   .entry-hours{font-weight:700;color:var(--primary);min-width:40px;text-align:right;font-size:.92rem;}
-  .entry-actions{display:flex;align-items:center;gap:4px;}
+  .entry-actions{display:flex;align-items:center;gap:2px;}
   .icon-btn{
     border:none;background:transparent;
     width:32px;height:32px;border-radius:8px;
@@ -154,24 +154,43 @@
 
   .empty-state{padding:50px 20px;text-align:center;color:var(--muted);font-size:.9rem;}
 
-  /* Work items — mobile-friendly stacked cards */
+  /* Work items — table on desktop, stacked cards on mobile */
   .items-panel{
     display:none;
     padding:0 20px 18px 48px;
     background:#fbfbfd;
   }
   .items-panel.open{display:block;}
-  .item-card{
+
+  .items-head{
+    display:grid;
+    grid-template-columns:110px 140px 60px 1fr 70px 76px;
+    grid-template-areas:"loc client no work hours actions";
+    gap:10px;
+    padding:10px 0;
+    border-bottom:1px solid var(--border);
+    color:var(--muted);
+    font-size:.78rem;
+    font-weight:600;
+  }
+  .items-head .item-hours-cell{text-align:right;}
+
+  .item-row{
+    display:grid;
+    grid-template-columns:110px 140px 60px 1fr 70px 76px;
+    grid-template-areas:"loc client no work hours actions";
+    align-items:center;
+    gap:10px;
     padding:14px 0;
     border-bottom:1px solid var(--border);
   }
-  .item-card:last-of-type{border-bottom:none;}
-  .item-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-  .item-client{font-weight:700;font-size:.92rem;color:var(--text);}
-  .item-hours{margin-left:auto;font-weight:700;color:var(--primary);font-size:.92rem;white-space:nowrap;}
-  .item-work{margin-top:6px;color:var(--text);font-size:.88rem;line-height:1.4;}
-  .item-meta{margin-top:4px;color:var(--muted);font-size:.8rem;}
-  .item-actions{display:flex;gap:16px;margin-top:10px;}
+  .item-row:last-of-type{border-bottom:none;}
+  .item-loc-cell{grid-area:loc;}
+  .item-client-cell{grid-area:client;font-weight:700;font-size:.92rem;color:var(--text);}
+  .item-no-cell{grid-area:no;color:var(--muted);font-size:.88rem;}
+  .item-work-cell{grid-area:work;color:var(--text);font-size:.88rem;line-height:1.4;}
+  .item-hours-cell{grid-area:hours;font-weight:700;color:var(--primary);font-size:.92rem;text-align:right;white-space:nowrap;}
+  .item-actions{grid-area:actions;display:flex;gap:2px;justify-content:flex-end;}
   .chip{
     background:var(--chip-bg);
     color:var(--text);
@@ -290,6 +309,20 @@
     .entry-row{flex-wrap:wrap;}
     .entry-date{min-width:110px;}
     .items-panel{padding-left:20px;}
+    .items-head{display:none;}
+    .item-row{
+      grid-template-columns:1fr auto;
+      grid-template-areas:
+        "loc hours"
+        "client hours"
+        "work work"
+        "no no"
+        "actions actions";
+      row-gap:6px;
+    }
+    .item-client-cell{align-self:start;}
+    .item-no-cell{color:var(--muted);font-size:.8rem;}
+    .item-actions{justify-content:flex-start;gap:16px;margin-top:4px;}
 
     /* Compact topbar: keep brand + actions on one row, let the title wrap
        instead of pushing the action buttons to a new line */
@@ -1392,19 +1425,25 @@
       rows = `<div class="items-empty">No work items logged for this day yet.</div>`;
     } else {
       const itemsTotal = items.reduce((s,it)=>s+it.hours,0);
-      rows = items.map(it => `
-        <div class="item-card">
-          <div class="item-top">
-            <span class="chip">${escapeHtml(it.location)}</span>
-            ${it.client ? `<span class="item-client">${escapeHtml(it.client)}</span>` : ''}
-            <span class="item-hours">${fmtHoursShort(it.hours)}</span>
-          </div>
-          ${it.work ? `<div class="item-work">${escapeHtml(it.work)}</div>` : ''}
-          ${(it.no || it.approver) ? `<div class="item-meta">${it.no ? 'No. '+escapeHtml(it.no) : ''}${it.no && it.approver ? ' · ' : ''}${it.approver ? 'Approver: '+escapeHtml(it.approver) : ''}</div>` : ''}
-          <div class="item-actions">
+      const head = `<div class="items-head">
+          <span class="item-loc-cell">Location</span>
+          <span class="item-client-cell">Client</span>
+          <span class="item-no-cell">No.</span>
+          <span class="item-work-cell">Work Accomplished</span>
+          <span class="item-hours-cell">Hours</span>
+          <span></span>
+        </div>`;
+      rows = head + items.map(it => `
+        <div class="item-row">
+          <span class="item-loc-cell"><span class="chip">${escapeHtml(it.location)}</span></span>
+          <span class="item-client-cell">${it.client ? escapeHtml(it.client) : '<span class="dash">—</span>'}</span>
+          <span class="item-no-cell">${it.no ? escapeHtml(it.no) : '<span class="dash">—</span>'}</span>
+          <span class="item-work-cell">${it.work ? escapeHtml(it.work) : ''}${it.approver ? `<div class="item-meta">Approver: ${escapeHtml(it.approver)}</div>` : ''}</span>
+          <span class="item-hours-cell">${fmtHoursShort(it.hours)}</span>
+          <span class="item-actions">
             <button class="icon-btn" title="Edit" onclick="WHT.editItem('${en.id}','${it.id}')">✎</button>
             <button class="icon-btn danger" title="Delete" onclick="WHT.deleteItem('${en.id}','${it.id}')">🗑</button>
-          </div>
+          </span>
         </div>`).join('') + `<div class="items-total"><span>Items total</span><span>${fmtHoursShort(itemsTotal)}</span></div>`;
     }
     return `<div class="items-panel ${isOpen ? 'open' : ''}">
