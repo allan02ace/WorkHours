@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#2f6fed">
+<meta name="theme-color" content="#16a34a">
 <title>Work Hours Tracker</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
@@ -14,8 +14,8 @@
 <meta name="apple-mobile-web-app-title" content="WorkHours">
 <style>
   :root{
-    --primary:#2f6fed;
-    --primary-dark:#1f56c9;
+    --primary:#16a34a;
+    --primary-dark:#15803d;
     --bg:#f6f7fb;
     --card:#ffffff;
     --text:#111827;
@@ -46,10 +46,11 @@
   .brand{display:flex;align-items:center;gap:12px;}
   .brand .icon{
     width:40px;height:40px;border-radius:10px;
-    background:#eaf0fe;color:var(--primary);
+    background:transparent;color:var(--primary);
     display:flex;align-items:center;justify-content:center;
-    font-size:1.2rem;
+    font-size:1.2rem;overflow:hidden;
   }
+  .brand .icon img{width:100%;height:100%;object-fit:cover;border-radius:10px;}
   .brand h1{margin:0;font-size:1.05rem;font-weight:700;}
   .brand p{margin:1px 0 0;font-size:.78rem;color:var(--muted);}
 
@@ -297,7 +298,7 @@
 
 <div class="topbar">
   <div class="brand">
-    <div class="icon">🕐</div>
+    <div class="icon"><img src="icon-192.png" alt="Work Hours Tracker logo"></div>
     <div>
       <h1>Work Hours Tracker</h1>
       <p>Daily timesheet log</p>
@@ -395,14 +396,14 @@
 <div class="modal-overlay" id="importModalOverlay">
   <div class="modal" style="max-width:560px;">
     <div class="modal-header">
-      <h2>Import from Biometrics</h2>
+      <h2>Import Data</h2>
       <button class="modal-close" id="importModalCloseBtn">✕</button>
     </div>
     <p style="font-size:.85rem;color:var(--muted);margin-top:-8px;">
-      Two ways to paste: <strong>(1) Straight from your biometrics spreadsheet</strong> — just select the day-number
+      <strong>Paste from your biometrics spreadsheet:</strong> select the day-number
       row and the times row for your name in Excel, copy, and paste below as-is (works even with multiple punches
-      stacked in one cell). Set the month/year first since the sheet only shows day numbers. Or
-      <strong>(2) one line per punch</strong>: <code>date, time-in, time-out</code>.
+      stacked in one cell). Set the month/year first since the sheet only shows day numbers. Or paste
+      <strong>one line per punch</strong>: <code>date, time-in, time-out</code>.
       If a punch has no match, it's defaulted rather than skipped: a lone morning punch gets a time-out
       8 hours later, and a lone afternoon/evening punch gets an 8:00 AM time-in.
     </p>
@@ -429,6 +430,20 @@
     <div class="modal-footer">
       <button type="button" class="btn btn-outline" id="importCancelBtn">Cancel</button>
       <button type="button" class="btn btn-primary" id="importSubmitBtn">Import Entries</button>
+    </div>
+
+    <div style="border-top:1px solid var(--border);margin:22px 0 16px;padding-top:16px;">
+      <div style="font-weight:700;margin-bottom:6px;">Restore from a backup file</div>
+      <p style="font-size:.85rem;color:var(--muted);margin-top:0;">
+        Upload a <strong>.xlsx, .xls, or .csv</strong> file — like a Timesheet backup this app exported earlier —
+        and it'll restore full days along with their Location, Client, Work Accomplished and Approver details.
+        Days that already exist will have their work items merged in rather than duplicated.
+      </p>
+      <input type="file" id="importFile" accept=".xlsx,.xls,.csv">
+      <div id="fileImportPreview" style="font-size:.82rem;color:var(--muted);margin-top:10px;max-height:160px;overflow-y:auto;"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" id="importFileBtn">Restore From File</button>
+      </div>
     </div>
   </div>
 </div>
@@ -513,6 +528,7 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="module">
   // ---- Firebase (cloud sync so your data follows you across devices) ----
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
@@ -744,6 +760,12 @@
   function fmtHoursShort(n){
     return (Math.round(n*100)/100) + 'h';
   }
+  // Day totals shown to the user (list, stats, summary, export) always
+  // deduct a 1-hour lunch break from the raw logged shift hours.
+  const LUNCH_BREAK_HOURS = 1;
+  function dayNetHours(en){
+    return Math.max(0, (en.hours||0) - LUNCH_BREAK_HOURS);
+  }
   function escapeHtml(str){
     const div = document.createElement('div');
     div.textContent = str == null ? '' : str;
@@ -932,6 +954,9 @@
   document.getElementById('importBtn').addEventListener('click', ()=>{
     importText.value = '';
     importPreview.textContent = '';
+    fileImportPreview.textContent = '';
+    importFile.value = '';
+    pendingFileEntries = null;
     const now = new Date();
     importMonth.value = String(now.getMonth()+1);
     importYear.value = now.getFullYear();
@@ -943,6 +968,142 @@
   function closeImportModal(){
     importModalOverlay.classList.remove('open');
   }
+
+  // ---- Restore from a backup file (.xlsx / .xls / .csv) ----
+  const importFile = document.getElementById('importFile');
+  const fileImportPreview = document.getElementById('fileImportPreview');
+  let pendingFileEntries = null;
+
+  function excelSerialToDate(serial){
+    const utcDays = Math.floor(serial - 25569);
+    const utcValue = utcDays * 86400;
+    const d = new Date(utcValue * 1000);
+    const fraction = serial - Math.floor(serial);
+    const totalSeconds = Math.round(fraction * 86400);
+    d.setUTCSeconds(d.getUTCSeconds() + totalSeconds);
+    return d;
+  }
+  function dateCellToISO(val){
+    if(val == null || val === '') return null;
+    if(val instanceof Date && !isNaN(val)){
+      return `${val.getFullYear()}-${pad(val.getMonth()+1)}-${pad(val.getDate())}`;
+    }
+    if(typeof val === 'number'){
+      const d = excelSerialToDate(val);
+      return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`;
+    }
+    return parseDate(String(val));
+  }
+  function timeCellToHHMM(val){
+    if(val == null || val === '') return null;
+    if(val instanceof Date && !isNaN(val)){
+      return `${pad(val.getHours())}:${pad(val.getMinutes())}`;
+    }
+    if(typeof val === 'number'){
+      const totalMin = Math.round(val*24*60);
+      return `${pad(Math.floor(totalMin/60)%24)}:${pad(totalMin%60)}`;
+    }
+    return parseTime(String(val));
+  }
+  function cellToNumber(val){
+    if(val == null || val === '') return 0;
+    const n = parseFloat(String(val).replace(/[^0-9.\-]/g,''));
+    return isNaN(n) ? 0 : n;
+  }
+  function cellToText(val){
+    return (val == null) ? '' : String(val).trim();
+  }
+
+  function buildEntriesFromSheetRows(rows){
+    const warnings = [];
+    const dayMap = new Map();
+    let itemCount = 0;
+    let last = { date:null, start:null, end:null };
+    let startRow = 0;
+    if(rows.length && /date/i.test(cellToText(rows[0][0]))) startRow = 1;
+    for(let i=startRow;i<rows.length;i++){
+      const r = rows[i] || [];
+      if(r.every(c => c===''||c==null)) continue;
+      const dateRaw = (r[0] !== '' && r[0] != null) ? r[0] : last.date;
+      const startRaw = (r[3] !== '' && r[3] != null) ? r[3] : last.start;
+      const endRaw = (r[4] !== '' && r[4] != null) ? r[4] : last.end;
+      const iso = dateCellToISO(dateRaw);
+      const start = timeCellToHHMM(startRaw);
+      const end = timeCellToHHMM(endRaw);
+      if(!iso || !start || !end){
+        warnings.push(`Row ${i+1}: couldn't read the date/time columns, skipped.`);
+        continue;
+      }
+      last = { date: dateRaw, start: startRaw, end: endRaw };
+      let entry = dayMap.get(iso);
+      if(!entry){
+        entry = { id: uid(), date: iso, start, end, hours: computeHours(start,end), items: [] };
+        dayMap.set(iso, entry);
+      }
+      const location = cellToText(r[2]);
+      const client = cellToText(r[5]);
+      const no = cellToText(r[6]);
+      const work = cellToText(r[7]);
+      const hoursItem = cellToNumber(r[8]);
+      const approver = cellToText(r[9]);
+      if(location || client || no || work || hoursItem || approver){
+        entry.items.push({ id: uid(), location, client, no, work, hours: hoursItem, approver });
+        itemCount++;
+      }
+    }
+    return { entries: Array.from(dayMap.values()), itemCount, warnings };
+  }
+
+  importFile.addEventListener('change', async ()=>{
+    const file = importFile.files[0];
+    fileImportPreview.textContent = '';
+    pendingFileEntries = null;
+    if(!file) return;
+    if(typeof XLSX === 'undefined'){
+      fileImportPreview.innerHTML = `<span style="color:var(--danger);">The spreadsheet reader didn't load — check your internet connection and try again.</span>`;
+      return;
+    }
+    try{
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type:'array', cellDates:true });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header:1, defval:'', raw:true });
+      const result = buildEntriesFromSheetRows(rows);
+      if(result.entries.length === 0){
+        fileImportPreview.innerHTML = `<span style="color:var(--danger);">Couldn't find any recognizable rows in that file. Make sure it's a Timesheet backup exported from this app.</span>`;
+        return;
+      }
+      pendingFileEntries = result.entries;
+      let msg = `Found <strong>${result.entries.length}</strong> day(s) with <strong>${result.itemCount}</strong> work item(s) ready to restore.`;
+      if(result.warnings.length) msg += `<br><span style="color:var(--danger);">${result.warnings.slice(0,5).join('<br>')}</span>`;
+      fileImportPreview.innerHTML = msg;
+    }catch(err){
+      console.error(err);
+      fileImportPreview.innerHTML = `<span style="color:var(--danger);">Couldn't read that file: ${escapeHtml(err.message)}</span>`;
+    }
+  });
+
+  document.getElementById('importFileBtn').addEventListener('click', ()=>{
+    if(!pendingFileEntries || pendingFileEntries.length === 0){
+      fileImportPreview.innerHTML = `<span style="color:var(--danger);">Choose a backup file first.</span>`;
+      return;
+    }
+    let added = 0, merged = 0;
+    pendingFileEntries.forEach(newEn=>{
+      const existing = entries.find(en => en.date === newEn.date);
+      if(existing){
+        existing.items = (existing.items || []).concat(newEn.items);
+        merged++;
+      } else {
+        entries.push(newEn);
+        added++;
+      }
+    });
+    save();
+    closeImportModal();
+    renderAll();
+    alert(`Restored ${added} new day(s)` + (merged ? `, and merged work items into ${merged} existing day(s).` : '.'));
+  });
 
   function parseDate(raw){
     raw = raw.trim();
@@ -1185,7 +1346,7 @@
 
   // ---- Rendering ----
   function renderStats(){
-    const totalHours = entries.reduce((sum,en)=>sum+en.hours,0);
+    const totalHours = entries.reduce((sum,en)=>sum+dayNetHours(en),0);
     const days = entries.length;
     const avg = days ? totalHours/days : 0;
     document.getElementById('statTotal').textContent = fmtHM(totalHours);
@@ -1251,7 +1412,7 @@
             <span class="ic">🕐</span>
             <span>${to12h(en.start)} – ${to12h(en.end)}</span>
           </div>
-          <div class="entry-hours">${en.hours}h</div>
+          <div class="entry-hours" title="Total for the day, minus 1hr lunch break">${fmtHoursShort(dayNetHours(en))}</div>
           <div class="entry-actions">
             <button class="icon-btn" title="Edit" onclick="WHT.editEntry('${en.id}')">✎</button>
             <button class="icon-btn danger" title="Delete" onclick="WHT.deleteEntry('${en.id}')">🗑</button>
@@ -1319,7 +1480,7 @@
       el.innerHTML = '<div class="empty-state">No data for this range.</div>';
       return;
     }
-    const totalHours = scoped.reduce((s,en)=>s+en.hours,0);
+    const totalHours = scoped.reduce((s,en)=>s+dayNetHours(en),0);
     const days = scoped.length;
     const avg = days ? totalHours/days : 0;
 
@@ -1330,7 +1491,7 @@
       const monday = new Date(d);
       monday.setDate(d.getDate()-dow);
       const key = monday.toISOString().slice(0,10);
-      weekTotals[key] = (weekTotals[key]||0) + en.hours;
+      weekTotals[key] = (weekTotals[key]||0) + dayNetHours(en);
     });
     const weeks = Object.keys(weekTotals).sort().reverse();
 
@@ -1369,7 +1530,7 @@
     scoped.forEach(en=>{
       const items = (en.items && en.items.length) ? en.items : [null];
       const rowCount = items.length;
-      const dayTotal = computeHours(en.start, en.end);
+      const dayTotal = dayNetHours(en);
       items.forEach((it, idx)=>{
         body += '<tr>';
         if(idx === 0){
@@ -1399,7 +1560,7 @@
 <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Timesheet</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
 <style>
   table{border-collapse:collapse;${FONT}}
-  th,td{border:1px solid #000000;padding:4px 8px;${FONT}vertical-align:top;}
+  th,td{border:none;padding:4px 8px;${FONT}vertical-align:top;}
   th{background:#DCE6F1;font-weight:bold;text-align:center;}
 </style>
 </head>
@@ -1408,7 +1569,7 @@
 <tr>
   <th>Date</th><th>Day</th><th>Location</th><th>Time-in</th><th>Time-out</th>
   <th>Client</th><th>No.</th><th>Work Accomplished</th><th>Hours Worked</th>
-  <th>Initial Approver</th><th>Hours Total (Day)</th>
+  <th>Initial Approver</th><th>Hours Total (Day, less 1hr lunch)</th>
 </tr>
 ${body}
 </table>
