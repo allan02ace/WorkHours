@@ -1545,28 +1545,34 @@
     const days = scoped.length;
     const avg = days ? totalHours/days : 0;
 
-    const weekTotals = {};
+    const cutoffTotals = {};
     scoped.forEach(en=>{
-      const d = new Date(en.date+'T00:00:00');
-      const dow = (d.getDay()+6)%7;
-      const monday = new Date(d);
-      monday.setDate(d.getDate()-dow);
-      const key = monday.toISOString().slice(0,10);
-      weekTotals[key] = (weekTotals[key]||0) + dayNetHours(en);
+      const [y,m,d] = en.date.split('-').map(Number);
+      const half = d <= 15 ? '1' : '2';
+      const key = `${y}-${String(m).padStart(2,'0')}-${half}`;
+      cutoffTotals[key] = (cutoffTotals[key]||0) + dayNetHours(en);
     });
-    const weeks = Object.keys(weekTotals).sort().reverse();
+    const cutoffs = Object.keys(cutoffTotals).sort().reverse();
+    function cutoffLabel(key){
+      const [y,m,half] = key.split('-');
+      const year = Number(y), month = Number(m);
+      const monthName = new Date(year, month-1, 1).toLocaleString('en-US', { month:'long' });
+      if(half === '1') return `${monthName} 1 – 15, ${year}`;
+      const lastDay = new Date(year, month, 0).getDate();
+      return `${monthName} 16 – ${lastDay}, ${year}`;
+    }
 
     let html = `<div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border);">
       <div><div class="label" style="font-size:.78rem;color:var(--muted);">Total Hours</div><div style="font-size:1.3rem;font-weight:700;color:var(--primary);">${fmtHM(totalHours)}</div></div>
       <div><div class="label" style="font-size:.78rem;color:var(--muted);">Work Days</div><div style="font-size:1.3rem;font-weight:700;">${days}</div></div>
       <div><div class="label" style="font-size:.78rem;color:var(--muted);">Avg / Day</div><div style="font-size:1.3rem;font-weight:700;">${fmtHM(avg)}</div></div>
     </div>`;
-    html += '<div style="font-weight:700;margin-bottom:14px;font-size:.95rem;">Weekly Totals</div>';
-    weeks.forEach(wk=>{
-      const label = fmtDateShort(wk);
-      const hrs = weekTotals[wk];
+    html += '<div style="font-weight:700;margin-bottom:14px;font-size:.95rem;">Cutoff Totals</div>';
+    cutoffs.forEach(key=>{
+      const label = cutoffLabel(key);
+      const hrs = cutoffTotals[key];
       html += `<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:.88rem;">
-        <span>Week of ${label}</span><span style="font-weight:700;color:var(--primary);">${fmtHM(hrs)}</span>
+        <span>${label}</span><span style="font-weight:700;color:var(--primary);">${fmtHM(hrs)}</span>
       </div>`;
     });
     el.innerHTML = html;
