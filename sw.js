@@ -3,7 +3,7 @@
 // All Firebase/Firestore/Google traffic is left alone — the Firestore SDK
 // handles its own offline queueing and syncs automatically once you're back online.
 
-const CACHE_NAME = 'wht-shell-v3';
+const CACHE_NAME = 'wht-shell-v6';
 const APP_SHELL = [
   './',
   './index.html',

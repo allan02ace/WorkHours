@@ -117,7 +117,9 @@
     align-items:center;
     gap:14px;
     padding:16px 20px;
+    cursor:pointer;
   }
+  .entry-row:hover{background:var(--bg);}
   .chevron{
     color:var(--muted);
     font-size:.9rem;
@@ -152,30 +154,24 @@
 
   .empty-state{padding:50px 20px;text-align:center;color:var(--muted);font-size:.9rem;}
 
-  /* Work items table */
+  /* Work items — mobile-friendly stacked cards */
   .items-panel{
     display:none;
     padding:0 20px 18px 48px;
     background:#fbfbfd;
   }
   .items-panel.open{display:block;}
-  .items-table{width:100%;border-collapse:collapse;font-size:.85rem;}
-  .items-table th{
-    text-align:left;
-    font-weight:600;
-    color:var(--muted);
-    font-size:.75rem;
-    text-transform:uppercase;
-    letter-spacing:.02em;
-    padding:8px 8px;
+  .item-card{
+    padding:14px 0;
     border-bottom:1px solid var(--border);
   }
-  .items-table td{
-    padding:10px 8px;
-    border-bottom:1px solid var(--border);
-    vertical-align:middle;
-  }
-  .items-table tr:last-child td{border-bottom:none;}
+  .item-card:last-of-type{border-bottom:none;}
+  .item-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .item-client{font-weight:700;font-size:.92rem;color:var(--text);}
+  .item-hours{margin-left:auto;font-weight:700;color:var(--primary);font-size:.92rem;white-space:nowrap;}
+  .item-work{margin-top:6px;color:var(--text);font-size:.88rem;line-height:1.4;}
+  .item-meta{margin-top:4px;color:var(--muted);font-size:.8rem;}
+  .item-actions{display:flex;gap:16px;margin-top:10px;}
   .chip{
     background:var(--chip-bg);
     color:var(--text);
@@ -184,8 +180,12 @@
     font-size:.78rem;
     display:inline-block;
   }
-  .items-empty{padding:14px 8px;color:var(--muted);font-size:.83rem;}
-  .items-total-row td{font-weight:700;color:var(--primary);border-bottom:none !important;}
+  .items-empty{padding:14px 0;color:var(--muted);font-size:.83rem;}
+  .items-total{
+    display:flex;justify-content:space-between;
+    padding:12px 0 4px;
+    font-weight:700;color:var(--primary);font-size:.88rem;
+  }
   .add-item-btn{margin-top:12px;}
   .dash{color:var(--muted);}
 
@@ -290,7 +290,34 @@
     .entry-row{flex-wrap:wrap;}
     .entry-date{min-width:110px;}
     .items-panel{padding-left:20px;}
-    .items-table{display:block;overflow-x:auto;white-space:nowrap;}
+
+    /* Compact topbar: keep brand + actions on one row, let the title wrap
+       instead of pushing the action buttons to a new line */
+    .topbar{flex-wrap:nowrap;padding:14px 16px;gap:8px;}
+    .brand{flex:1 1 auto;min-width:0;}
+    .brand h1{font-size:.98rem;}
+    .topbar-actions{flex-shrink:0;flex-wrap:nowrap;gap:6px;}
+    .btn-label{display:none;}
+    .btn{padding:9px 11px;}
+    .tab{padding:9px 11px;}
+    .auth-avatar,.auth-name{display:none;}
+    .auth-signout{background:none;border:none;color:var(--muted);padding:6px 4px;}
+
+    /* Add/Edit modals feel like a bottom sheet on phones */
+    .modal-overlay{padding:0;align-items:flex-end;}
+    .modal{
+      max-width:100%;
+      border-radius:20px 20px 0 0;
+      max-height:92vh;
+      overflow-y:auto;
+      padding:22px 18px 26px;
+    }
+    .modal-footer{flex-direction:column;gap:14px;align-items:stretch;margin-top:16px;}
+    .modal-footer .btn-primary{order:-1;width:100%;justify-content:center;}
+    .modal-footer .btn-outline{
+      background:none;border:none;color:var(--muted);
+      font-weight:600;justify-content:center;padding:4px;
+    }
   }
 </style>
 </head>
@@ -306,12 +333,12 @@
   </div>
   <div class="topbar-actions">
     <div class="tabs">
-      <button class="tab active" id="tabLog">📋 Log</button>
-      <button class="tab" id="tabSummary">📊 Summary</button>
+      <button class="tab active" id="tabLog">📋<span class="btn-label"> Log</span></button>
+      <button class="tab" id="tabSummary">📊<span class="btn-label"> Summary</span></button>
     </div>
     <div id="authArea" style="display:flex;align-items:center;gap:8px;"></div>
-    <button class="btn btn-outline" id="importBtn">⇩ Import</button>
-    <button class="btn btn-primary" id="addDayBtn">＋ Add Day</button>
+    <button class="btn btn-outline" id="importBtn">⇩<span class="btn-label"> Import</span></button>
+    <button class="btn btn-primary" id="addDayBtn">＋<span class="btn-label"> Add Day</span></button>
   </div>
 </div>
 <div id="syncBanner" style="display:none;background:#eef1f6;color:#374151;font-size:.8rem;text-align:center;padding:6px 10px;"></div>
@@ -667,9 +694,9 @@
     const el = document.getElementById('authArea');
     if(!el) return;
     if(user){
-      const avatar = user.photoURL ? `<img src="${user.photoURL}" alt="" style="width:26px;height:26px;border-radius:50%;">` : '';
+      const avatar = user.photoURL ? `<img class="auth-avatar" src="${user.photoURL}" alt="" style="width:26px;height:26px;border-radius:50%;">` : '';
       const name = escapeHtml(user.displayName || user.email || 'Signed in');
-      el.innerHTML = `${avatar}<span style="font-size:.78rem;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</span><button class="btn btn-outline" id="signOutBtn" style="padding:6px 10px;font-size:.78rem;">Sign out</button>`;
+      el.innerHTML = `${avatar}<span class="auth-name" style="font-size:.78rem;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</span><button class="btn btn-outline auth-signout" id="signOutBtn" style="padding:6px 10px;font-size:.78rem;">⎋<span class="btn-label"> Sign out</span></button>`;
       document.getElementById('signOutBtn').addEventListener('click', ()=> signOut(fbAuth));
     } else {
       el.innerHTML = `<button class="btn btn-outline" id="signInBtn" style="padding:6px 10px;font-size:.78rem;">🔑 Sign in with Google</button>`;
@@ -803,6 +830,7 @@
       recalcHours();
     }
     modalOverlay.classList.add('open');
+    setTimeout(()=> fDate.focus(), 0);
   }
   function closeModal(){
     modalOverlay.classList.remove('open');
@@ -886,6 +914,7 @@
       setSelectedChip('1');
     }
     itemModalOverlay.classList.add('open');
+    setTimeout(()=> iLocation.focus(), 0);
   }
   function closeItemModal(){
     itemModalOverlay.classList.remove('open');
@@ -961,6 +990,7 @@
     importMonth.value = String(now.getMonth()+1);
     importYear.value = now.getFullYear();
     importModalOverlay.classList.add('open');
+    setTimeout(()=> importMonth.focus(), 0);
   });
   document.getElementById('importCancelBtn').addEventListener('click', closeImportModal);
   document.getElementById('importModalCloseBtn').addEventListener('click', closeImportModal);
@@ -1362,29 +1392,20 @@
       rows = `<div class="items-empty">No work items logged for this day yet.</div>`;
     } else {
       const itemsTotal = items.reduce((s,it)=>s+it.hours,0);
-      rows = `<table class="items-table">
-        <thead>
-          <tr><th>Location</th><th>Client</th><th>No.</th><th>Work Accomplished</th><th>Hours</th><th>Initial Approver</th><th></th></tr>
-        </thead>
-        <tbody>`;
-      items.forEach(it=>{
-        rows += `<tr>
-          <td><span class="chip">${escapeHtml(it.location)}</span></td>
-          <td>${it.client ? escapeHtml(it.client) : '<span class="dash">—</span>'}</td>
-          <td>${it.no ? escapeHtml(it.no) : '<span class="dash">—</span>'}</td>
-          <td>${it.work ? escapeHtml(it.work) : '<span class="dash">—</span>'}</td>
-          <td style="font-weight:700;color:var(--primary);">${fmtHoursShort(it.hours)}</td>
-          <td>${it.approver ? escapeHtml(it.approver) : '<span class="dash">—</span>'}</td>
-          <td>
-            <div class="entry-actions">
-              <button class="icon-btn" title="Edit" onclick="WHT.editItem('${en.id}','${it.id}')">✎</button>
-              <button class="icon-btn danger" title="Delete" onclick="WHT.deleteItem('${en.id}','${it.id}')">🗑</button>
-            </div>
-          </td>
-        </tr>`;
-      });
-      rows += `<tr class="items-total-row"><td colspan="4" style="text-align:right;">Items total</td><td>${fmtHoursShort(itemsTotal)}</td><td></td><td></td></tr>`;
-      rows += `</tbody></table>`;
+      rows = items.map(it => `
+        <div class="item-card">
+          <div class="item-top">
+            <span class="chip">${escapeHtml(it.location)}</span>
+            ${it.client ? `<span class="item-client">${escapeHtml(it.client)}</span>` : ''}
+            <span class="item-hours">${fmtHoursShort(it.hours)}</span>
+          </div>
+          ${it.work ? `<div class="item-work">${escapeHtml(it.work)}</div>` : ''}
+          ${(it.no || it.approver) ? `<div class="item-meta">${it.no ? 'No. '+escapeHtml(it.no) : ''}${it.no && it.approver ? ' · ' : ''}${it.approver ? 'Approver: '+escapeHtml(it.approver) : ''}</div>` : ''}
+          <div class="item-actions">
+            <button class="icon-btn" title="Edit" onclick="WHT.editItem('${en.id}','${it.id}')">✎</button>
+            <button class="icon-btn danger" title="Delete" onclick="WHT.deleteItem('${en.id}','${it.id}')">🗑</button>
+          </div>
+        </div>`).join('') + `<div class="items-total"><span>Items total</span><span>${fmtHoursShort(itemsTotal)}</span></div>`;
     }
     return `<div class="items-panel ${isOpen ? 'open' : ''}">
       ${rows}
@@ -1402,9 +1423,9 @@
     sorted.forEach(en=>{
       const isOpen = expandedId === en.id;
       html += `<div class="day-block">
-        <div class="entry-row">
-          <button class="chevron" onclick="WHT.toggleExpand('${en.id}')">${isOpen ? '▾' : '▸'}</button>
-          <div class="entry-date" onclick="WHT.toggleExpand('${en.id}')" style="cursor:pointer;">
+        <div class="entry-row" onclick="WHT.toggleExpand('${en.id}')">
+          <button class="chevron" onclick="event.stopPropagation();WHT.toggleExpand('${en.id}')">${isOpen ? '▾' : '▸'}</button>
+          <div class="entry-date">
             <div class="d">${fmtDateShort(en.date)}</div>
             <div class="dow">${dayOfWeek(en.date)}</div>
           </div>
@@ -1414,8 +1435,8 @@
           </div>
           <div class="entry-hours" title="Total for the day, minus 1hr lunch break">${fmtHoursShort(dayNetHours(en))}</div>
           <div class="entry-actions">
-            <button class="icon-btn" title="Edit" onclick="WHT.editEntry('${en.id}')">✎</button>
-            <button class="icon-btn danger" title="Delete" onclick="WHT.deleteEntry('${en.id}')">🗑</button>
+            <button class="icon-btn" title="Edit" onclick="event.stopPropagation();WHT.editEntry('${en.id}')">✎</button>
+            <button class="icon-btn danger" title="Delete" onclick="event.stopPropagation();WHT.deleteEntry('${en.id}')">🗑</button>
           </div>
         </div>
         ${renderItemsPanel(en)}
@@ -1453,6 +1474,7 @@
     rangeFrom.value = rangeStart || '';
     rangeTo.value = rangeEnd || '';
     rangeModalOverlay.classList.add('open');
+    setTimeout(()=> rangeFrom.focus(), 0);
   });
   function closeRangeModal(){ rangeModalOverlay.classList.remove('open'); }
   document.getElementById('rangeModalCloseBtn').addEventListener('click', closeRangeModal);
@@ -1589,6 +1611,36 @@ ${body}
     URL.revokeObjectURL(url);
   }
   document.getElementById('exportCsvBtn').addEventListener('click', exportTimesheet);
+
+  // ---- Keep keyboard/Tab navigation trapped inside whichever modal is open ----
+  function getFocusable(container){
+    return Array.from(container.querySelectorAll(
+      'input:not([type="hidden"]),select,textarea,button,[tabindex]:not([tabindex="-1"])'
+    )).filter(el => !el.disabled && el.offsetParent !== null);
+  }
+  document.addEventListener('keydown', (e)=>{
+    const openOverlay = document.querySelector('.modal-overlay.open');
+    if(!openOverlay) return;
+    const modal = openOverlay.querySelector('.modal');
+    if(!modal) return;
+    if(e.key === 'Tab'){
+      const focusables = getFocusable(modal);
+      if(focusables.length === 0) return;
+      const first = focusables[0], last = focusables[focusables.length-1];
+      if(!modal.contains(document.activeElement)){
+        e.preventDefault();
+        first.focus();
+        return;
+      }
+      if(e.shiftKey && document.activeElement === first){
+        e.preventDefault();
+        last.focus();
+      } else if(!e.shiftKey && document.activeElement === last){
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  });
 
   function renderAll(){
     renderStats();
