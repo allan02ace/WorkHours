@@ -2,9 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#2f6fed">
 <title>Work Hours Tracker</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<!-- iOS "Add to Home Screen" support -->
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="WorkHours">
 <style>
   :root{
     --primary:#2f6fed;
@@ -513,7 +520,7 @@
     getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
   } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
   import {
-    getFirestore, doc, setDoc, onSnapshot
+    getFirestore, doc, setDoc, onSnapshot, enableIndexedDbPersistence
   } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -529,6 +536,21 @@
   const fbAuth = getAuth(fbApp);
   const fbDb = getFirestore(fbApp);
   const googleProvider = new GoogleAuthProvider();
+
+  // Let Firestore queue writes locally while offline and auto-sync when back online.
+  enableIndexedDbPersistence(fbDb).catch((err)=>{
+    // Fails if multiple tabs are open at once, or the browser doesn't support it —
+    // the app still works fine, it just won't cache Firestore data between page loads.
+    console.warn('Offline persistence not enabled:', err.code);
+  });
+
+  // Install the service worker so the app shell loads even with no connection,
+  // and can be added to your phone's home screen.
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('SW registration failed', err));
+    });
+  }
 
 (function(){
   const STORAGE_KEY = 'wht_days_v3';
@@ -648,6 +670,13 @@
     renderAuthArea(user);
     if(user) startCloudSync(user);
     else stopCloudSync();
+  });
+
+  window.addEventListener('offline', ()=>{
+    if(currentUser) showSyncBanner('📴 Offline — changes will sync once you\'re back online', true);
+  });
+  window.addEventListener('online', ()=>{
+    if(currentUser) showSyncBanner('☁️ Back online — syncing…', true);
   });
 
   // ---- Recurring client suggestions ----
@@ -775,7 +804,9 @@
     if(editingId){
       entries = entries.map(en => en.id === editingId ? Object.assign({}, en, data) : en);
     } else {
-      entries.push(Object.assign({ id: uid(), items: [] }, data));
+      const newEntry = Object.assign({ id: uid(), items: [] }, data);
+      entries.push(newEntry);
+      expandedId = newEntry.id;
     }
     save();
     closeModal();
@@ -1212,7 +1243,7 @@
       html += `<div class="day-block">
         <div class="entry-row">
           <button class="chevron" onclick="WHT.toggleExpand('${en.id}')">${isOpen ? '▾' : '▸'}</button>
-          <div class="entry-date">
+          <div class="entry-date" onclick="WHT.toggleExpand('${en.id}')" style="cursor:pointer;">
             <div class="d">${fmtDateShort(en.date)}</div>
             <div class="dow">${dayOfWeek(en.date)}</div>
           </div>
