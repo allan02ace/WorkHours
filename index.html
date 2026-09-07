@@ -154,6 +154,68 @@
 
   .empty-state{padding:50px 20px;text-align:center;color:var(--muted);font-size:.9rem;}
 
+  /* Batch select */
+  .btn.active-select{background:var(--text);color:#fff;}
+  .batch-toolbar{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:14px 16px;
+    margin-bottom:16px;
+    display:none;
+  }
+  .batch-toolbar-row{
+    display:flex;align-items:center;justify-content:space-between;
+    flex-wrap:wrap;gap:10px;
+  }
+  .batch-toolbar-row+.batch-toolbar-row{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
+  .batch-select-all{display:flex;align-items:center;gap:8px;font-size:.85rem;font-weight:600;cursor:pointer;}
+  .batch-select-all input{width:auto;}
+  .batch-range{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .batch-range input[type="date"]{width:auto;padding:8px 10px;font-size:.83rem;}
+  .batch-range .sep{color:var(--muted);font-size:.85rem;}
+  .batch-presets{display:flex;gap:6px;flex-wrap:wrap;}
+  .chip-btn{
+    border:1px solid var(--border);background:#fff;color:var(--text);
+    padding:6px 10px;border-radius:999px;font-size:.78rem;font-weight:600;
+  }
+  .chip-btn:hover{background:var(--bg);}
+  #selectedCount{font-size:.85rem;color:var(--muted);font-weight:600;}
+  #batchDeleteBtn{background:var(--danger);color:#fff;}
+  #batchDeleteBtn:hover{background:#b91c1c;}
+  #batchDeleteBtn:disabled{opacity:.5;cursor:not-allowed;}
+
+  /* Cutoff salary rows */
+  .cutoff-row{padding:12px 0;border-bottom:1px solid var(--border);}
+  .cutoff-row-main{display:flex;justify-content:space-between;font-size:.88rem;margin-bottom:10px;}
+  .cutoff-row-salary{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .cutoff-row-salary label{margin:0;font-size:.76rem;font-weight:500;color:var(--muted);white-space:nowrap;}
+  .cutoff-salary-input-wrap{
+    display:flex;align-items:center;
+    border:1px solid var(--border);border-radius:8px;
+    background:#fff;overflow:hidden;
+  }
+  .cutoff-salary-input-wrap .currency-prefix{
+    padding:8px 0 8px 10px;color:var(--muted);font-size:.85rem;
+  }
+  .cutoff-salary-input{
+    width:130px;border:none;padding:8px 10px 8px 4px;
+    font-size:.85rem;text-align:right;
+  }
+  .cutoff-salary-input:focus{outline:none;}
+  .cutoff-rate{font-size:.78rem;color:var(--primary);font-weight:600;}
+  .entry-checkbox{
+    display:flex;align-items:center;justify-content:center;
+    width:20px;flex-shrink:0;cursor:pointer;
+  }
+  .entry-checkbox input{width:17px;height:17px;cursor:pointer;}
+  .entry-row.select-mode:hover{background:var(--bg);}
+
+  @media (max-width:640px){
+    .batch-toolbar-row{flex-direction:column;align-items:stretch;}
+    .batch-range{justify-content:space-between;}
+  }
+
   /* Work items — table on desktop, stacked cards on mobile */
   .items-panel{
     display:none;
@@ -371,6 +433,7 @@
     </div>
     <div id="authArea" style="display:flex;align-items:center;gap:8px;"></div>
     <button class="btn btn-outline" id="importBtn">⇩<span class="btn-label"> Import</span></button>
+    <button class="btn btn-outline" id="selectModeBtn">☑<span class="btn-label"> Select</span></button>
     <button class="btn btn-primary" id="addDayBtn">＋<span class="btn-label"> Add Day</span></button>
   </div>
 </div>
@@ -394,6 +457,31 @@
   </div>
 
   <div id="logView">
+    <div class="batch-toolbar" id="batchToolbar">
+      <div class="batch-toolbar-row">
+        <label class="batch-select-all">
+          <input type="checkbox" id="selectAllCheckbox"> Select all
+        </label>
+        <div class="batch-range">
+          <input type="date" id="batchRangeFrom" title="From date">
+          <span class="sep">–</span>
+          <input type="date" id="batchRangeTo" title="To date">
+          <button type="button" class="btn btn-outline" id="batchRangeSelectBtn">Select Range</button>
+          <div class="batch-presets">
+            <button type="button" class="chip-btn" data-days="7">Last 7d</button>
+            <button type="button" class="chip-btn" data-days="30">Last 30d</button>
+            <button type="button" class="chip-btn" data-days="90">Last 90d</button>
+          </div>
+        </div>
+      </div>
+      <div class="batch-toolbar-row">
+        <span id="selectedCount">0 selected</span>
+        <div style="display:flex;gap:10px;">
+          <button type="button" class="btn btn-outline" id="batchCancelBtn">Cancel</button>
+          <button type="button" class="btn" id="batchDeleteBtn" disabled>🗑 Delete Selected</button>
+        </div>
+      </div>
+    </div>
     <div class="list-card" id="listCard">
       <div class="empty-state">No days logged yet. Click "Add Day" to get started.</div>
     </div>
@@ -630,6 +718,7 @@
 
 (function(){
   const STORAGE_KEY = 'wht_days_v3';
+  const SALARY_KEY = 'wht_cutoff_salaries_v1';
   let entries = load();
   let editingId = null;
   let expandedId = null;
@@ -638,6 +727,9 @@
   let itemEditingItemId = null;
   let rangeStart = null;
   let rangeEnd = null;
+  let selectMode = false;
+  let selectedIds = new Set();
+  let cutoffSalaries = loadSalaries();
   let currentUser = null;
   let unsubscribeCloud = null;
 
@@ -675,6 +767,16 @@
   function save(){
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
     pushToCloud();
+  }
+
+  function loadSalaries(){
+    try{
+      const raw = localStorage.getItem(SALARY_KEY);
+      return raw ? JSON.parse(raw) : {};
+    }catch(e){ return {}; }
+  }
+  function saveSalaries(){
+    localStorage.setItem(SALARY_KEY, JSON.stringify(cutoffSalaries));
   }
 
   // ---- Cloud sync (Google sign-in + Firestore) ----
@@ -996,7 +1098,7 @@
   }
 
   window.WHT = {
-    deleteEntry, editEntry, toggleExpand,
+    deleteEntry, editEntry, toggleExpand, toggleSelect,
     addItem: (dayId)=> openItemModal(dayId, null),
     editItem: (dayId, itemId)=>{
       const day = entries.find(en=>en.id===dayId);
@@ -1400,6 +1502,7 @@
   document.getElementById('tabSummary').addEventListener('click', ()=>switchView('summary'));
   function switchView(view){
     activeView = view;
+    if(view !== 'log' && selectMode) setSelectMode(false);
     document.getElementById('tabLog').classList.toggle('active', view==='log');
     document.getElementById('tabSummary').classList.toggle('active', view==='summary');
     document.getElementById('logView').style.display = view==='log' ? 'block' : 'none';
@@ -1461,9 +1564,14 @@
     let html = '';
     sorted.forEach(en=>{
       const isOpen = expandedId === en.id;
+      const isChecked = selectedIds.has(en.id);
+      const rowClick = selectMode ? `WHT.toggleSelect('${en.id}')` : `WHT.toggleExpand('${en.id}')`;
       html += `<div class="day-block">
-        <div class="entry-row" onclick="WHT.toggleExpand('${en.id}')">
-          <button class="chevron" onclick="event.stopPropagation();WHT.toggleExpand('${en.id}')">${isOpen ? '▾' : '▸'}</button>
+        <div class="entry-row ${selectMode ? 'select-mode' : ''}" onclick="${rowClick}">
+          ${selectMode
+            ? `<label class="entry-checkbox" onclick="event.stopPropagation()"><input type="checkbox" ${isChecked?'checked':''} onchange="WHT.toggleSelect('${en.id}')"></label>`
+            : `<button class="chevron" onclick="event.stopPropagation();WHT.toggleExpand('${en.id}')">${isOpen ? '▾' : '▸'}</button>`
+          }
           <div class="entry-date">
             <div class="d">${fmtDateShort(en.date)}</div>
             <div class="dow">${dayOfWeek(en.date)}</div>
@@ -1474,15 +1582,101 @@
           </div>
           <div class="entry-hours" title="Total for the day, minus 1hr lunch break">${fmtHoursShort(dayNetHours(en))}</div>
           <div class="entry-actions">
+            ${selectMode ? '' : `
             <button class="icon-btn" title="Edit" onclick="event.stopPropagation();WHT.editEntry('${en.id}')">✎</button>
-            <button class="icon-btn danger" title="Delete" onclick="event.stopPropagation();WHT.deleteEntry('${en.id}')">🗑</button>
+            <button class="icon-btn danger" title="Delete" onclick="event.stopPropagation();WHT.deleteEntry('${en.id}')">🗑</button>`}
           </div>
         </div>
-        ${renderItemsPanel(en)}
+        ${selectMode ? '' : renderItemsPanel(en)}
       </div>`;
     });
     listCard.innerHTML = html;
   }
+
+  // ---- Batch select / delete ----
+  function setSelectMode(on){
+    selectMode = on;
+    if(!selectMode) selectedIds.clear();
+    document.getElementById('batchToolbar').style.display = selectMode ? 'block' : 'none';
+    const btn = document.getElementById('selectModeBtn');
+    btn.classList.toggle('active-select', selectMode);
+    btn.innerHTML = selectMode ? '✕<span class="btn-label"> Cancel</span>' : '☑<span class="btn-label"> Select</span>';
+    document.getElementById('addDayBtn').style.display = selectMode ? 'none' : '';
+    document.getElementById('importBtn').style.display = selectMode ? 'none' : '';
+    renderList();
+    updateBatchToolbar();
+  }
+  function toggleSelect(id){
+    if(selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
+    renderList();
+    updateBatchToolbar();
+  }
+  function selectByDates(fromStr, toStr){
+    selectedIds.clear();
+    entries.forEach(en=>{
+      if(fromStr && en.date < fromStr) return;
+      if(toStr && en.date > toStr) return;
+      selectedIds.add(en.id);
+    });
+    renderList();
+    updateBatchToolbar();
+  }
+  function updateBatchToolbar(){
+    const total = entries.length;
+    const selCount = selectedIds.size;
+    document.getElementById('selectedCount').textContent =
+      selCount === 0 ? '0 selected' : `${selCount} of ${total} selected`;
+    const selectAllCb = document.getElementById('selectAllCheckbox');
+    selectAllCb.checked = total > 0 && selCount === total;
+    selectAllCb.indeterminate = selCount > 0 && selCount < total;
+    document.getElementById('batchDeleteBtn').disabled = selCount === 0;
+  }
+
+  document.getElementById('selectModeBtn').addEventListener('click', ()=> setSelectMode(!selectMode));
+  document.getElementById('batchCancelBtn').addEventListener('click', ()=> setSelectMode(false));
+
+  document.getElementById('selectAllCheckbox').addEventListener('change', (e)=>{
+    if(e.target.checked){
+      entries.forEach(en=> selectedIds.add(en.id));
+    } else {
+      selectedIds.clear();
+    }
+    renderList();
+    updateBatchToolbar();
+  });
+
+  document.getElementById('batchRangeSelectBtn').addEventListener('click', ()=>{
+    const from = document.getElementById('batchRangeFrom').value;
+    const to = document.getElementById('batchRangeTo').value;
+    if(!from && !to){ alert('Pick a From and/or To date first.'); return; }
+    selectByDates(from || null, to || null);
+  });
+
+  document.querySelectorAll('.chip-btn[data-days]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const days = parseInt(btn.dataset.days, 10);
+      const today = new Date();
+      const cutoff = new Date();
+      cutoff.setDate(today.getDate() - (days - 1));
+      const pad = n => String(n).padStart(2,'0');
+      const toDate = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+      const fromStr = toDate(cutoff);
+      const toStr = toDate(today);
+      document.getElementById('batchRangeFrom').value = fromStr;
+      document.getElementById('batchRangeTo').value = toStr;
+      selectByDates(fromStr, toStr);
+    });
+  });
+
+  document.getElementById('batchDeleteBtn').addEventListener('click', ()=>{
+    const count = selectedIds.size;
+    if(count === 0) return;
+    if(!confirm(`Delete ${count} selected day${count>1?'s':''}? This cannot be undone.`)) return;
+    entries = entries.filter(en=> !selectedIds.has(en.id));
+    save();
+    setSelectMode(false);
+    renderAll();
+  });
 
   // ---- Custom range filtering ----
   function inRange(dateStr){
@@ -1571,12 +1765,40 @@
     cutoffs.forEach(key=>{
       const label = cutoffLabel(key);
       const hrs = cutoffTotals[key];
-      html += `<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:.88rem;">
-        <span>${label}</span><span style="font-weight:700;color:var(--primary);">${fmtHM(hrs)}</span>
+      const salaryVal = cutoffSalaries[key];
+      const rate = (salaryVal && hrs) ? (salaryVal / hrs) : null;
+      html += `<div class="cutoff-row">
+        <div class="cutoff-row-main">
+          <span>${label}</span><span style="font-weight:700;color:var(--primary);">${fmtHM(hrs)}</span>
+        </div>
+        <div class="cutoff-row-salary">
+          <label for="salary-${key}">Salary for this cutoff</label>
+          <div class="cutoff-salary-input-wrap">
+            <span class="currency-prefix">₱</span>
+            <input type="number" id="salary-${key}" class="cutoff-salary-input" data-key="${key}"
+              placeholder="0.00" min="0" step="0.01"
+              value="${salaryVal != null ? salaryVal : ''}">
+          </div>
+          ${rate != null ? `<span class="cutoff-rate">≈ ₱${rate.toFixed(2)}/hr</span>` : ''}
+        </div>
       </div>`;
     });
     el.innerHTML = html;
   }
+
+  document.getElementById('summaryContent').addEventListener('change', (e)=>{
+    const input = e.target.closest('.cutoff-salary-input');
+    if(!input) return;
+    const key = input.dataset.key;
+    const val = input.value.trim();
+    if(val === ''){
+      delete cutoffSalaries[key];
+    } else {
+      cutoffSalaries[key] = parseFloat(val) || 0;
+    }
+    saveSalaries();
+    renderSummary();
+  });
 
   // ---- Export CSV (Excel-formatted, Aptos 10pt, matches timesheet columns) ----
   function cellHtml(str){
