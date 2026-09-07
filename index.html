@@ -226,8 +226,8 @@
 
   .items-head{
     display:grid;
-    grid-template-columns:110px 140px 60px 1fr 70px 76px;
-    grid-template-areas:"loc client no work hours actions";
+    grid-template-columns:24px 110px 140px 60px 1fr 70px 76px;
+    grid-template-areas:"handle loc client no work hours actions";
     gap:10px;
     padding:10px 0;
     border-bottom:1px solid var(--border);
@@ -239,13 +239,36 @@
 
   .item-row{
     display:grid;
-    grid-template-columns:110px 140px 60px 1fr 70px 76px;
-    grid-template-areas:"loc client no work hours actions";
+    grid-template-columns:24px 110px 140px 60px 1fr 70px 76px;
+    grid-template-areas:"handle loc client no work hours actions";
     align-items:center;
     gap:10px;
     padding:14px 0;
     border-bottom:1px solid var(--border);
+    background:var(--card);
   }
+  .item-row.dragging{
+    opacity:.55;
+    box-shadow:0 6px 16px rgba(0,0,0,.14);
+    border-radius:8px;
+    position:relative;
+    z-index:2;
+  }
+  .item-drag-handle{
+    grid-area:handle;
+    display:flex;align-items:center;justify-content:center;
+    align-self:stretch;
+    cursor:grab;
+    touch-action:none;
+    user-select:none;
+    -webkit-user-select:none;
+    color:var(--muted);
+    font-size:1rem;
+    line-height:1;
+    letter-spacing:-1px;
+  }
+  .item-drag-handle:active{cursor:grabbing;}
+  .items-head .item-drag-handle{cursor:default;}
   .item-row:last-of-type{border-bottom:none;}
   .item-loc-cell{grid-area:loc;}
   .item-client-cell{grid-area:client;font-weight:700;font-size:.92rem;color:var(--text);}
@@ -373,15 +396,16 @@
     .items-panel{padding-left:20px;}
     .items-head{display:none;}
     .item-row{
-      grid-template-columns:1fr auto;
+      grid-template-columns:20px 1fr auto;
       grid-template-areas:
-        "loc hours"
-        "client hours"
-        "work work"
-        "no no"
-        "actions actions";
+        "handle loc hours"
+        "handle client hours"
+        "handle work work"
+        "handle no no"
+        "handle actions actions";
       row-gap:6px;
     }
+    .item-drag-handle{font-size:1.15rem;}
     .item-client-cell{align-self:start;}
     .item-no-cell{color:var(--muted);font-size:.8rem;}
     .item-actions{justify-content:flex-start;gap:16px;margin-top:4px;}
@@ -1529,6 +1553,7 @@
     } else {
       const itemsTotal = items.reduce((s,it)=>s+it.hours,0);
       const head = `<div class="items-head">
+          <span class="item-drag-handle"></span>
           <span class="item-loc-cell">Location</span>
           <span class="item-client-cell">Client</span>
           <span class="item-no-cell">No.</span>
@@ -1537,7 +1562,8 @@
           <span></span>
         </div>`;
       rows = head + items.map(it => `
-        <div class="item-row">
+        <div class="item-row" data-item-id="${it.id}">
+          <span class="item-drag-handle" title="Drag to reorder">⠿</span>
           <span class="item-loc-cell"><span class="chip">${escapeHtml(it.location)}</span></span>
           <span class="item-client-cell">${it.client ? escapeHtml(it.client) : '<span class="dash">—</span>'}</span>
           <span class="item-no-cell">${it.no ? escapeHtml(it.no) : '<span class="dash">—</span>'}</span>
@@ -1549,11 +1575,60 @@
           </span>
         </div>`).join('') + `<div class="items-total"><span>Items total</span><span>${fmtHoursShort(itemsTotal)}</span></div>`;
     }
-    return `<div class="items-panel ${isOpen ? 'open' : ''}">
+    return `<div class="items-panel ${isOpen ? 'open' : ''}" data-day-id="${en.id}">
       ${rows}
       <button type="button" class="btn btn-outline add-item-btn" onclick="WHT.addItem('${en.id}')">＋ Add Work Item</button>
     </div>`;
   }
+
+  // ---- Drag-to-reorder work items ----
+  let itemDrag = null;
+  listCard.addEventListener('pointerdown', (e)=>{
+    const handle = e.target.closest('.item-drag-handle');
+    if(!handle || handle.closest('.items-head')) return;
+    const row = handle.closest('.item-row');
+    const panel = handle.closest('.items-panel');
+    if(!row || !panel) return;
+    e.preventDefault();
+    itemDrag = { row, panel, pointerId: e.pointerId };
+    row.classList.add('dragging');
+    try{ row.setPointerCapture(e.pointerId); }catch(err){}
+  });
+  listCard.addEventListener('pointermove', (e)=>{
+    if(!itemDrag || e.pointerId !== itemDrag.pointerId) return;
+    e.preventDefault();
+    const { row, panel } = itemDrag;
+    const overEl = document.elementFromPoint(e.clientX, e.clientY);
+    const overRow = overEl && overEl.closest('.item-row');
+    if(!overRow || overRow === row || overRow.closest('.items-panel') !== panel) return;
+    const rect = overRow.getBoundingClientRect();
+    const midpoint = rect.top + rect.height / 2;
+    if(e.clientY < midpoint){
+      panel.insertBefore(row, overRow);
+    } else {
+      panel.insertBefore(row, overRow.nextSibling);
+    }
+  });
+  function endItemDrag(e){
+    if(!itemDrag || (e && e.pointerId !== itemDrag.pointerId)) return;
+    const { row, panel, pointerId } = itemDrag;
+    row.classList.remove('dragging');
+    try{ row.releasePointerCapture(pointerId); }catch(err){}
+    const dayId = panel.dataset.dayId;
+    const day = entries.find(en=>en.id===dayId);
+    if(day && day.items){
+      const orderedIds = Array.from(panel.querySelectorAll('.item-row')).map(r=>r.dataset.itemId);
+      const byId = new Map(day.items.map(it=>[it.id, it]));
+      const reordered = orderedIds.map(id=>byId.get(id)).filter(Boolean);
+      if(reordered.length === day.items.length){
+        day.items = reordered;
+        save();
+      }
+    }
+    itemDrag = null;
+  }
+  listCard.addEventListener('pointerup', endItemDrag);
+  listCard.addEventListener('pointercancel', endItemDrag);
 
   function renderList(){
     if(entries.length === 0){
